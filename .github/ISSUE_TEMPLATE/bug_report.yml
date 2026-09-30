@@ -9,7 +9,7 @@ body:
         感谢反馈！提交之前请先花一分钟看一眼这两处的排查表，有些问题那里已经有答案：
 
         - README → **「这个学校系统的坑」** 与 **「常见问题排查」**
-        - [AGENT_SETUP.md](../blob/main/AGENT_SETUP.md) → **第七节 常见问题排查**
+        - [AGENT_SETUP.md](https://github.com/genhaoer66/snut-course-notifier/blob/main/AGENT_SETUP.md) → **第七节 常见问题排查**
 
   - type: checkboxes
     id: preflight
