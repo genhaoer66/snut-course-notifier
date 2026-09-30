@@ -20,7 +20,7 @@
 - [它解决什么问题](#它解决什么问题)
 - [特性](#特性)
 - [架构](#架构)
-- [快速开始](#快速开始)
+- [快速开始](#快速开始)（🤖 [交给 AI 助手配置](AGENT_SETUP.md)）
 - [配置项](#配置项)
 - [命令](#命令)
 - [这个学校系统的坑](#这个学校系统的坑)
@@ -84,10 +84,15 @@
 
 ## 快速开始
 
+> 🤖 **不想手动配置？** 把 [AGENT_SETUP.md](AGENT_SETUP.md) 里的提示词整段复制给你的 AI 助手
+> （Claude Code / Cursor / ChatGPT…），它会问你要几个必要信息，然后自动克隆、装依赖、验证登录、
+> 抓一次课表并起网站给你预览。
+
 需要 Python 3.8 或更高版本（本地 3.8.6 与服务器 3.13 均已实测）。
 
 ```bash
-git clone <你的仓库地址> && cd course-notifier
+git clone https://github.com/genhaoer66/snut-course-notifier.git
+cd snut-course-notifier
 
 python -m venv .venv
 # Windows
