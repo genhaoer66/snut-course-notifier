@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 配置卡住了 / 想交给 AI 助手配置
+    url: https://github.com/genhaoer66/snut-course-notifier/blob/main/AGENT_SETUP.md
+    about: 新用户可以把这个文件里的提示词整段复制给 AI 助手，它会带你走完配置流程
+  - name: ❓ 常见问题排查表
+    url: https://github.com/genhaoer66/snut-course-notifier#%E8%BF%99%E4%B8%AA%E5%AD%A6%E6%A0%A1%E7%B3%BB%E7%BB%9F%E7%9A%84%E5%9D%91
+    about: 「请不要过快点击」「需要验证码」「课表差一周」等问题这里已有答案

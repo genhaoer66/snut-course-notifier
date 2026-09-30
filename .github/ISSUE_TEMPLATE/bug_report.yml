@@ -1,0 +1,71 @@
+name: 报告一个问题
+description: 使用中遇到报错、异常，或者结果不对（比如课表显示错了、周次差一周）
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！提交之前请先花一分钟看一眼这两处的排查表，有些问题那里已经有答案：
+
+        - README → **「这个学校系统的坑」** 与 **「常见问题排查」**
+        - [AGENT_SETUP.md](../blob/main/AGENT_SETUP.md) → **第七节 常见问题排查**
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已经看过上面两处的排查表，确认不是已知问题
+          required: true
+        - label: 我确认下面**没有粘贴**学号、密码、Cookie、邮箱授权码等敏感信息
+          required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: 出问题的是哪一步
+      options:
+        - 安装依赖 / 环境
+        - 克隆、运行命令
+        - 登录教务系统
+        - 抓取或解析课表
+        - 邮件 / 微信推送
+        - 网站显示
+        - 其它
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 运行环境
+      description: 操作系统 + Python 版本
+      placeholder: 例如 Windows 11 + Python 3.8.6，或 Debian 13 + Python 3.13
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象与复现步骤
+      description: |
+        你做了什么、期望是什么、实际发生了什么。**有报错请把完整输出贴上来**（记得先去掉敏感信息）。
+        如果是「课表显示不对」，请说明你用的是第几周、以及学校的口径。
+      placeholder: |
+        1. 执行 python -m snut.main --dry-run
+        2. 期望：打印出今天的课表
+        3. 实际：……
+        4. 完整输出：……
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息（可选）
+      description: |
+        是否首次运行、`.env` 里与账号无关的配置（如 `REQUEST_INTERVAL` / `HTTP_TIMEOUT`）、
+        是否已登录过、用的哪所学校。**不要粘贴任何账号或密码。**
+    validations:
+      required: false

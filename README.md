@@ -1,5 +1,7 @@
 # 陕理工课表小助手
 
+[![Checks](https://github.com/genhaoer66/snut-course-notifier/actions/workflows/ci.yml/badge.svg)](https://github.com/genhaoer66/snut-course-notifier/actions/workflows/ci.yml)
+
 > 陕西理工大学（金智统一身份认证 + 树维 EAMS）的**课表自动推送 + 课表网站**。
 > 每天定时登录教务系统抓一次课表 → 把当天的课发到手机 → 同时生成一份脱敏快照，
 > 供一个只读网页展示。
