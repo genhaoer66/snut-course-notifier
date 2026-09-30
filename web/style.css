@@ -459,8 +459,19 @@ button:focus-visible { outline: 3px solid rgba(32, 49, 112, .35); outline-offset
   border-spacing: 4px;
   table-layout: fixed;
 }
-.schedule th { height: 36px; color: var(--steel); font-size: 14.5px; font-weight: 700; }
+.schedule th { height: 48px; padding-top: 4px; color: var(--steel); font-size: 14.5px; font-weight: 700; }
 .schedule th.today { color: var(--navy); }
+/* 表头第二行：日期（第 5 周 → 9/28 … 10/4） */
+.schedule .day-date {
+  display: block;
+  margin-top: 3px;
+  color: var(--mist);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.schedule th.today .day-date { color: var(--navy); }
+.schedule th.weekend .day-date { color: var(--mist); }
 .schedule th.today::after {
   content: "";
   display: block;

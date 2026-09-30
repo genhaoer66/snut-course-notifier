@@ -192,6 +192,24 @@
     return delta < 0 ? 1 : Math.floor(delta / 7) + 1;
   }
 
+  /* 某一教学周里周一到周日各自的日期文本（形如 "9/28"）。
+   * 开学日期就是第 1 周的周一，所以第 n 周的周一 = 开学日期 + (n-1)*7 天。
+   * 没配置 SEMESTER_START 时返回 null，表头就只显示星期、不显示日期。 */
+  function weekDates(week, startIso) {
+    if (!startIso) return null;
+    var monday = parseDate(startIso);
+    var out = [];
+    for (var i = 0; i < 7; i++) {
+      // 用 Date 构造器做日期加减，跨月、跨年都不会出错
+      var d = new Date(
+        monday.getFullYear(), monday.getMonth(),
+        monday.getDate() + (week - 1) * 7 + i
+      );
+      out.push((d.getMonth() + 1) + "/" + d.getDate());
+    }
+    return out;
+  }
+
   /* 课程配色：色相锁在青蓝→紫之间（186–271），保持鲸鱼配色的整体调性。 */
   function toneOf(name) {
     var hash = 0;
@@ -448,10 +466,14 @@
     var head = node("thead");
     var headRow = node("tr");
     headRow.appendChild(node("th", "unit", ""));
+    var dates = weekDates(state.week, state.data.semester_start);
     for (day = 0; day < 7; day++) {
       var mark = (day === todayDay && markToday) ? "today" : "";
       if (day >= 5) mark = (mark + " weekend").trim();
-      headRow.appendChild(node("th", mark, "周" + WEEKDAYS[day]));
+      var th = node("th", mark, "周" + WEEKDAYS[day]);
+      // 表头第二行：这一天在这一周里的具体日期
+      if (dates) th.appendChild(node("span", "day-date", dates[day]));
+      headRow.appendChild(th);
     }
     head.appendChild(headRow);
     table.appendChild(head);
