@@ -1,0 +1,116 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#e8eefc">
+  <title>我的课表</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23203170'/><path fill='white' d='M8 9h16v14H8zM11 6h2v6h-2zm8 0h2v6h-2z'/></svg>">
+  <link rel="stylesheet" href="/static/style.css?v=20260930.6">
+</head>
+<body>
+  <!-- 极光背景：液态玻璃必须有东西可透、可折射，否则玻璃感为零 -->
+  <div class="sky" aria-hidden="true">
+    <i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i>
+    <i class="blob b4"></i><i class="blob b5"></i>
+  </div>
+
+  <div id="boot" class="state-screen"><div class="spinner"></div><p>正在加载课表…</p></div>
+
+  <div id="gate" class="gate" hidden>
+    <form id="gate-form" class="gate-card glass">
+      <div class="gate-logo">🐋</div>
+      <h1>我的课表</h1>
+      <p>输入访问口令</p>
+      <input id="gate-input" type="password" autocomplete="current-password" placeholder="访问口令" required>
+      <button id="gate-button" type="submit">进入课表</button>
+      <div id="gate-error" class="error" hidden></div>
+    </form>
+  </div>
+
+  <div id="fatal" class="state-screen" hidden>
+    <div class="fatal-icon">☁</div><p id="fatal-text">暂时无法加载课表</p>
+    <button id="fatal-retry" class="outline-button">重新加载</button>
+  </div>
+
+  <div id="app" hidden>
+    <div class="shell">
+
+      <!-- 页面最顶端：随机诗句（本地古诗文数据，不联网） -->
+      <p class="poem glass" id="poem">
+        <span class="poem-text" id="poem-text"></span>
+        <span class="poem-from" id="poem-from"></span>
+      </p>
+
+      <header class="topbar glass">
+        <div class="brand">
+          <div class="brand-mark">🐋</div>
+          <div><h1>我的课表</h1><p>陕西理工大学 · 课表自动推送</p></div>
+        </div>
+        <span class="sync-note">每日 07:00 自动更新</span>
+      </header>
+
+      <section class="hero glass">
+        <div>
+          <p id="hero-eyebrow" class="eyebrow"></p>
+          <h2 id="hero-title">今天的安排</h2>
+          <p id="hero-date" class="hero-date"></p>
+        </div>
+        <div class="week-card">
+          <span>当前教学周</span>
+          <strong id="hero-week">第 1 周</strong>
+          <div class="progress"><i id="week-progress"></i></div>
+          <small id="week-progress-label"></small>
+        </div>
+      </section>
+
+      <div class="toolbar">
+        <div class="segmented glass" role="tablist">
+          <button class="view-tab active" data-view="today" role="tab">今日</button>
+          <button class="view-tab" data-view="week" role="tab">周课表</button>
+        </div>
+        <div class="week-nav glass">
+          <button id="prev-week" class="week-arrow" type="button" aria-label="上一周">‹</button>
+          <button id="week-label" class="week-current" type="button" title="回到本周">第 1 周</button>
+          <button id="next-week" class="week-arrow" type="button" aria-label="下一周">›</button>
+        </div>
+      </div>
+
+      <main>
+        <div id="pane-today" class="content">
+          <section class="panel glass">
+            <div class="panel-heading"><h3 id="today-heading">今天</h3><span id="today-count"></span></div>
+            <div id="today-list" class="course-list"></div>
+          </section>
+          <aside class="panel side-panel glass">
+            <h3>本周概览</h3>
+            <div id="stats" class="stats"></div>
+            <div class="tip"><strong>小提示</strong><span>点击课程卡片查看完整信息，左右箭头可以切换教学周。</span></div>
+          </aside>
+        </div>
+
+        <section id="pane-week" class="panel week-panel glass" hidden>
+          <div class="panel-heading"><h3 id="grid-heading">第 1 周课表</h3><span>点击课程查看详情</span></div>
+          <div class="grid-scroll"><table id="grid" class="schedule"></table></div>
+          <p class="grid-hint">手机上可以左右滑动查看完整课表</p>
+        </section>
+      </main>
+
+      <footer class="footer"><span id="updated"></span><span>·</span><span id="semester"></span></footer>
+    </div>
+  </div>
+
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-mask" data-close></div>
+    <section class="sheet-card glass" role="dialog" aria-modal="true" aria-labelledby="sheet-name">
+      <button class="sheet-close" data-close type="button" aria-label="关闭">×</button>
+      <h2 id="sheet-name"></h2>
+      <dl class="detail-list"><dt>时间</dt><dd id="sheet-when"></dd><dt>教室</dt><dd id="sheet-room"></dd><dt>教师</dt><dd id="sheet-teacher"></dd><dt>周次</dt><dd id="sheet-weeks"></dd></dl>
+    </section>
+  </div>
+
+  <script src="/static/app.js?v=20260930.6"></script>
+</body>
+</html>

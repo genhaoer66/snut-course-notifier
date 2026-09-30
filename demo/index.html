@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>课表 Demo</title>
+<style>
+:root{--ink:#172033;--muted:#8290a8;--line:#e8edf5;--bg:#f6f8fc;--panel:#fff;--blue:#4169e8;--blue2:#7d91ff;--shadow:0 18px 45px #31446b12;--r:24px}
+*{box-sizing:border-box}html{font-family:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink)}body{margin:0;background:radial-gradient(circle at 82% -10%,#d9e4ff 0,transparent 33%),var(--bg)}button{font:inherit;border:0;background:none;color:inherit;cursor:pointer}button:focus-visible{outline:3px solid #4169e866;outline-offset:3px}
+.shell{width:min(1180px,100%);margin:auto;padding:28px 24px 42px}.top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:30px}.brand{display:flex;align-items:center;gap:12px}.logo{display:grid;place-items:center;width:44px;height:44px;border-radius:15px;background:linear-gradient(140deg,#4169e8,#94a5ff);color:white;font-size:21px;box-shadow:0 10px 24px #4169e83d}.brand h1{margin:0;font-size:20px;letter-spacing:-.04em}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.top-actions{display:flex;gap:8px}.icon-btn{width:40px;height:40px;border:1px solid #fff;border-radius:13px;background:#ffffffb8;box-shadow:0 5px 16px #31446b0b;font-size:18px}
+.hero{position:relative;display:grid;grid-template-columns:1.2fr .8fr;gap:20px;overflow:hidden;padding:30px;border-radius:30px;background:linear-gradient(125deg,#1b2b55 0%,#334f9f 72%,#7894fa 100%);color:#fff;box-shadow:0 22px 50px #29458d38}.hero:after{content:"";position:absolute;right:-100px;bottom:-140px;width:360px;height:360px;border:1px solid #ffffff2b;border-radius:50%;box-shadow:0 0 0 35px #ffffff0b,0 0 0 70px #ffffff07}.eyebrow{margin:0 0 14px;color:#c3d0ff;font-size:12px;font-weight:800;letter-spacing:.16em}.hero h2{max-width:600px;margin:0;font-size:clamp(30px,5vw,52px);line-height:1.1;letter-spacing:-.07em}.hero h2 span{color:#aebdff}.hero-date{margin:18px 0 0;color:#d8e0ff;font-size:14px}.hero-side{align-self:end;justify-self:end;min-width:220px;padding:18px;border:1px solid #ffffff2a;border-radius:20px;background:#ffffff12;backdrop-filter:blur(10px)}.hero-side small{color:#c7d3ff}.week-big{display:block;margin-top:3px;font-size:36px;font-weight:850;letter-spacing:-.06em}.progress{height:5px;margin-top:15px;border-radius:99px;background:#ffffff25}.progress i{display:block;width:24%;height:100%;border-radius:inherit;background:#b9c6ff}
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin:28px 0 14px}.seg{display:flex;padding:4px;border-radius:14px;background:#e9eef8}.seg button{padding:9px 18px;border-radius:10px;color:var(--muted);font-size:13px}.seg button.active{background:#fff;color:var(--blue);font-weight:800;box-shadow:0 4px 12px #30476d12}.week-nav{display:flex;align-items:center;gap:4px}.week-nav button{height:34px;border-radius:10px}.week-nav .arrow{width:34px;color:var(--muted);font-size:22px}.week-nav .current{padding:0 10px;color:var(--blue);font-size:13px;font-weight:800}
+.content{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px}.panel{background:#ffffffe8;border:1px solid #fff;border-radius:var(--r);box-shadow:var(--shadow)}.panel-head{display:flex;align-items:center;justify-content:space-between;padding:22px 22px 6px}.panel-head h3{margin:0;font-size:17px;letter-spacing:-.03em}.panel-head span{color:var(--muted);font-size:12px}.course-list{padding:12px 16px 16px}.course{display:grid;grid-template-columns:74px 1fr auto;gap:15px;align-items:center;position:relative;margin:0 0 9px;padding:15px;border:1px solid var(--line);border-radius:17px;background:#fff;transition:.18s}.course:hover{transform:translateY(-2px);box-shadow:0 10px 20px #31446b12}.course:last-child{margin-bottom:0}.time{color:var(--tone);font-size:12px;font-weight:850}.time strong{display:block;margin-bottom:3px;font-size:18px;letter-spacing:-.04em}.course h4{margin:0;font-size:14px;line-height:1.35}.course p{margin:5px 0 0;color:var(--muted);font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:var(--tone)}.empty-demo{padding:40px 20px;text-align:center;color:var(--muted)}.empty-demo b{display:block;margin-bottom:7px;color:var(--ink);font-size:25px}
+.mini-title{padding:22px 22px 12px;font-size:14px;font-weight:800}.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 16px 16px}.stat{padding:14px;border-radius:16px;background:#f6f8fd}.stat b{display:block;font-size:22px;letter-spacing:-.05em}.stat span{color:var(--muted);font-size:11px}.tip{margin:0 16px 16px;padding:15px;border-radius:17px;background:#edf2ff;color:#536ba8;font-size:12px;line-height:1.65}.tip strong{display:block;margin-bottom:4px;color:#294cae}
+.grid-wrap{overflow:auto;padding:12px 14px 16px}.schedule{min-width:650px;border-collapse:separate;border-spacing:4px;table-layout:fixed}.schedule th{height:32px;color:var(--muted);font-size:12px}.schedule th.today{color:var(--blue)}.schedule .unit{width:32px;color:#b4bfd1;font-size:11px;font-weight:700}.schedule td{height:62px;vertical-align:top}.block{height:100%;padding:7px;border-left:3px solid var(--tone);border-radius:10px;background:color-mix(in srgb,var(--tone) 11%,white);color:#293757;font-size:11px;font-weight:800;line-height:1.3}.block small{display:block;margin-top:4px;color:#71809b;font-size:10px;font-weight:500}
+.footer{text-align:center;margin-top:22px;color:#a2adbf;font-size:11px}.modal{position:fixed;inset:0;display:grid;place-items:end center;padding:20px;background:#15234466;backdrop-filter:blur(4px)}.modal[hidden]{display:none}.modal-box{width:min(520px,100%);padding:26px;border-radius:25px;background:#fff;box-shadow:0 22px 70px #14244840}.modal-box h3{margin:0 0 17px;font-size:20px}.detail{display:grid;grid-template-columns:52px 1fr;gap:10px;font-size:14px}.detail dt{color:var(--muted);font-size:12px}.detail dd{margin:0}.close{float:right;width:30px;height:30px;border-radius:10px;background:#f1f4f9;color:var(--muted)}
+@media(max-width:760px){.shell{padding:18px 14px 32px}.top{margin-bottom:18px}.hero{grid-template-columns:1fr;padding:24px;border-radius:25px}.hero-side{justify-self:stretch;min-width:0}.content{grid-template-columns:1fr}.toolbar{margin-top:20px}.course{grid-template-columns:64px 1fr}.course .dot{display:none}.brand h1{font-size:18px}.logo{width:40px;height:40px}.top-actions{display:none}}
+@media(prefers-reduced-motion:reduce){.course{transition:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="top">
+  <div class="brand"><div class="logo">▦</div><div><h1>班级课表</h1><p>示例班级 · Demo 数据</p></div></div>
+  <div class="top-actions"><button class="icon-btn" aria-label="刷新">↻</button><button class="icon-btn" aria-label="设置">⋯</button></div>
+</header>
+<section class="hero">
+  <div><p class="eyebrow">FRIDAY · SEP 25</p><h2>今天有 <span>2 门课</span><br>安排得刚刚好。</h2><p class="hero-date">2026 年 9 月 25 日　星期五　·　第 4 周</p></div>
+  <div class="hero-side"><small>当前教学周</small><strong class="week-big">第 4 周</strong><div class="progress"><i></i></div><small>本学期第 4 / 17 周</small></div>
+</section>
+<div class="toolbar">
+  <div class="seg"><button class="active" data-view="today">今日</button><button data-view="week">周课表</button></div>
+  <div class="week-nav"><button class="arrow" data-week="-1">‹</button><button class="current">第 4 周</button><button class="arrow" data-week="1">›</button></div>
+</div>
+<div class="content">
+  <section class="panel" id="today-view">
+    <div class="panel-head"><h3>今天 · 星期五</h3><span>2 门课程</span></div>
+    <div class="course-list">
+      <button class="course" style="--tone:#e28b3c" data-name="工程制图" data-room="教学楼 A203" data-teacher="教师 A" data-time="第 3 - 4 节"><div class="time"><strong>03—04</strong>09:50—11:35</div><div><h4>工程制图</h4><p>教学楼 A203　·　教师 A</p></div><i class="dot"></i></button>
+      <button class="course" style="--tone:#5c78e8" data-name="车辆动力学" data-room="教学楼 B407" data-teacher="教师 B" data-time="第 7 - 8 节"><div class="time"><strong>07—08</strong>14:00—15:45</div><div><h4>车辆动力学</h4><p>教学楼 B407　·　教师 B</p></div><i class="dot"></i></button>
+    </div>
+  </section>
+  <aside class="panel">
+    <div class="mini-title">本周概览</div><div class="stat-grid"><div class="stat"><b>18</b><span>本周课程</span></div><div class="stat"><b>6</b><span>上课日</span></div><div class="stat"><b>11</b><span>节次总数</span></div><div class="stat"><b>6302</b><span>常用教室</span></div></div>
+    <div class="tip"><strong>小提示</strong>点击课程卡片可以查看完整信息。左右箭头可以切换教学周。</div>
+  </aside>
+</div>
+<section class="panel" id="week-view" hidden style="margin-top:20px"><div class="panel-head"><h3>第 4 周课表</h3><span>点击课程查看详情</span></div><div class="grid-wrap"><table class="schedule"><thead><tr><th class="unit">　</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th class="today">周五</th><th>周六</th><th>周日</th></tr></thead><tbody>
+<tr><th class="unit">1</th><td></td><td><div class="block" style="--tone:#5c78e8">计算方法<small>6302（南区）</small></div></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th class="unit">2</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th class="unit">3</th><td><div class="block" style="--tone:#68a88c">控制工程基础<small>6302（南区）</small></div></td><td></td><td></td><td><div class="block" style="--tone:#d47b9a">工程制图<small>6406（南区）</small></div></td><td><div class="block" style="--tone:#e28b3c">思政概论<small>6302（南区）</small></div></td><td></td><td></td></tr>
+<tr><th class="unit">4</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th class="unit">5</th><td><div class="block" style="--tone:#e28b3c">思政概论<small>6302（南区）</small></div></td><td><div class="block" style="--tone:#5c78e8">车辆工程材料<small>6407（南区）</small></div></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><th class="unit">6</th><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+</tbody></table></div></section>
+<p class="footer">数据更新于 2026-09-25 18:50　·　由课表小助手提供</p>
+</div>
+<div class="modal" id="modal" hidden><div class="modal-box"><button class="close" id="close">×</button><h3 id="modal-title"></h3><dl class="detail"><dt>时间</dt><dd id="modal-time"></dd><dt>教室</dt><dd id="modal-room"></dd><dt>教师</dt><dd id="modal-teacher"></dd><dt>周次</dt><dd>第 4 周</dd></dl></div></div>
+<script>
+const today=document.getElementById("today-view"),week=document.getElementById("week-view");
+document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.toggle("active",x===b));today.hidden=b.dataset.view!=="today";week.hidden=b.dataset.view!=="week"});
+document.querySelectorAll(".course").forEach(c=>c.onclick=()=>{document.getElementById("modal-title").textContent=c.dataset.name;document.getElementById("modal-time").textContent=c.dataset.time;document.getElementById("modal-room").textContent=c.dataset.room;document.getElementById("modal-teacher").textContent=c.dataset.teacher;document.getElementById("modal").hidden=false});
+document.getElementById("close").onclick=()=>document.getElementById("modal").hidden=true;document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")e.currentTarget.hidden=true};
+document.querySelectorAll("[data-week]").forEach(b=>b.onclick=()=>alert("Demo：这里会切换到第 "+(b.dataset.week==="1"?"5":"3")+" 周"));
+</script>
+</body>
+</html>

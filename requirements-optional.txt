@@ -1,0 +1,3 @@
+# Optional captcha OCR support.
+# Without this package, captcha_login.py can still be used manually.
+ddddocr>=1.5.0

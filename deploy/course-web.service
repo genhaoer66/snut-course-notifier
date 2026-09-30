@@ -1,0 +1,48 @@
+# 课表网站 —— systemd 服务单元
+#
+# 安装：
+#     sudo cp deploy/course-web.service /etc/systemd/system/
+#     sudo systemctl daemon-reload
+#     sudo systemctl enable --now course-web
+#
+# 查看状态与日志：
+#     systemctl status course-web
+#     journalctl -u course-web -n 50 -f
+
+[Unit]
+Description=课表网站 (Course Notifier Web)
+Documentation=file:/opt/course-notifier/DEPLOY.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/course-notifier
+
+# ⚠️ 必须绑 127.0.0.1，不要改成 0.0.0.0。
+# 公网入口走 cloudflared 隧道，源站不开放任何入站端口——
+# 这样别人扫到 8000 端口也连不上，也就不用担心绕过 Cloudflare 直连源站。
+ExecStart=/opt/course-notifier/.venv/bin/uvicorn snut.webapp:app \
+          --host 127.0.0.1 --port 8000 --proxy-headers
+
+# 隧道是从本机发起的，所以这里只信任回环来的转发头
+Environment=FORWARDED_ALLOW_IPS=127.0.0.1
+Environment=PYTHONUNBUFFERED=1
+
+Restart=always
+RestartSec=5
+
+# 日志进 journald，用 journalctl -u course-web 看
+StandardOutput=journal
+StandardError=journal
+
+# 一点基本的加固。网站只需要读 data/ 和 web/、不需要写任何东西，
+# 所以把整个文件系统挂成只读，只留 /tmp 可写。
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/course-notifier/data
+
+[Install]
+WantedBy=multi-user.target

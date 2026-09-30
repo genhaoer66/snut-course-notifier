@@ -1,0 +1,31 @@
+# 陕西理工大学课表自动推送 —— Python 依赖
+#
+# 安装：
+#     python -m pip install -r requirements.txt
+#
+# 注：本项目在 Python 3.8.6 (Windows) 上实测通过。
+
+# HTTP 请求
+requests>=2.31.0
+
+# HTML 解析（提取登录页隐藏字段、课表页 ids）
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# 密码加密（学校统一认证要求 AES-CBC/PKCS7）
+# 对应 encrypt.js 中的 CryptoJS.AES.encrypt
+pycryptodome>=3.19.0
+
+# 读取 .env 配置
+python-dotenv>=1.0.0
+
+# ============================================================
+#  网站部分
+#
+#  只跑邮件推送的话可以不装这两个；要起网站（snut/webapp.py）才需要。
+#  服务器上装一次即可：
+#      .venv/bin/pip install fastapi uvicorn
+# ============================================================
+
+fastapi>=0.110
+uvicorn>=0.27
