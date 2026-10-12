@@ -1,27 +1,88 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#e8eefc">
+  <meta name="theme-color" content="#eef1fa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1224" media="(prefers-color-scheme: dark)">
   <title>我的课表</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23203170'/><path fill='white' d='M8 9h16v14H8zM11 6h2v6h-2zm8 0h2v6h-2z'/></svg>">
-  <link rel="stylesheet" href="/static/style.css?v=20260930.8">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23203170'/><path fill='none' stroke='white' stroke-width='2' stroke-linecap='round' d='M8 18c4 0 6-2 8-6 2 4 4 6 8 6M9 23c3 1 11 1 14 0'/></svg>">
+
+  <!-- 全部图标与鲸鱼标记都内联在此，页面不请求任何外部资源 -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <!-- 鲸鱼：一条背脊 + 一条水线，几何化到只用两笔，避免 emoji 的多彩失真 -->
+      <symbol id="i-whale" viewBox="0 0 24 24">
+        <path d="M3 13.5c3.4 0 5.4-1.6 7-5.2 1.6 3.6 3.6 5.2 7 5.2 1.2 0 2.2-.2 3-.6-.7 3.9-4.2 6.6-8.5 6.6-4.6 0-8.4-2.6-8.5-6z"
+              fill="currentColor" opacity=".92"/>
+        <path d="M4 18.4c3.4 1.1 12.6 1.1 16 0" fill="none" stroke="currentColor"
+              stroke-width="1.6" stroke-linecap="round" opacity=".45"/>
+      </symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24">
+        <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-next" viewBox="0 0 24 24">
+        <path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-cloud-off" viewBox="0 0 24 24">
+        <path d="M6.5 17h11a4 4 0 0 0 .6-7.95 5.5 5.5 0 0 0-8.2-3.5M8 17a4 4 0 0 1-1.5-7.7"
+              fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M4 4l16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24">
+        <path d="M12 21c4-4.4 6-7.7 6-10a6 6 0 1 0-12 0c0 2.3 2 5.6 6 10z" fill="none"
+              stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <circle cx="12" cy="11" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/>
+      </symbol>
+      <symbol id="i-user" viewBox="0 0 24 24">
+        <circle cx="12" cy="8.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <path d="M5.5 19.5c1.2-3.2 3.6-4.6 6.5-4.6s5.3 1.4 6.5 4.6" fill="none"
+              stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24">
+        <rect x="3.8" y="5.4" width="16.4" height="14.4" rx="2.6" fill="none"
+              stroke="currentColor" stroke-width="1.7"/>
+        <path d="M3.8 10h16.4M8.6 3.4v4M15.4 3.4v4" fill="none" stroke="currentColor"
+              stroke-width="1.7" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M19.5 12a7.5 7.5 0 1 1-2.4-5.5" fill="none" stroke="currentColor"
+              stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M19.8 4.6v4.2h-4.2" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <link rel="stylesheet" href="/static/style.css?v=20261012.3">
 </head>
 <body>
-  <!-- 极光背景：液态玻璃必须有东西可透、可折射，否则玻璃感为零 -->
+  <!-- 极光背景：玻璃需要背后有可折射的东西，否则只是半透明色块 -->
   <div class="sky" aria-hidden="true">
     <i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i>
     <i class="blob b4"></i><i class="blob b5"></i>
+    <span class="grain"></span>
   </div>
 
-  <div id="boot" class="state-screen"><div class="spinner"></div><p>正在加载课表…</p></div>
+  <div id="boot" class="state-screen">
+    <div class="skeleton" aria-hidden="true">
+      <span class="sk sk-a"></span><span class="sk sk-b"></span>
+      <span class="sk sk-c"></span><span class="sk sk-d"></span>
+    </div>
+    <p>正在加载课表…</p>
+  </div>
 
   <div id="gate" class="gate" hidden>
     <form id="gate-form" class="gate-card glass">
-      <div class="gate-logo">🐋</div>
+      <span class="gate-logo"><svg class="icon icon-whale"><use href="#i-whale"></use></svg></span>
       <h1>我的课表</h1>
       <p>输入访问口令</p>
       <input id="gate-input" type="password" autocomplete="current-password" placeholder="访问口令" required>
@@ -31,14 +92,17 @@
   </div>
 
   <div id="fatal" class="state-screen" hidden>
-    <div class="fatal-icon">☁</div><p id="fatal-text">暂时无法加载课表</p>
-    <button id="fatal-retry" class="outline-button">重新加载</button>
+    <svg class="icon icon-fatal"><use href="#i-cloud-off"></use></svg>
+    <p id="fatal-text">暂时无法加载课表</p>
+    <button id="fatal-retry" class="outline-button" type="button">
+      <svg class="icon"><use href="#i-refresh"></use></svg>重新加载
+    </button>
   </div>
 
   <div id="app" hidden>
     <div class="shell">
 
-      <!-- 页面最顶端：随机诗句（本地古诗文数据，不联网） -->
+      <!-- 页面最顶端：字同时从上下飞入，排成一行（本地诗句数据，不联网） -->
       <p class="poem glass" id="poem">
         <span class="poem-text" id="poem-text"></span>
         <span class="poem-from" id="poem-from"></span>
@@ -46,71 +110,101 @@
 
       <header class="topbar glass">
         <div class="brand">
-          <div class="brand-mark">🐋</div>
-          <div><h1>我的课表</h1><p>陕西理工大学 · 课表自动推送</p></div>
+          <span class="brand-mark"><svg class="icon icon-whale"><use href="#i-whale"></use></svg></span>
+          <div class="brand-text">
+            <h1>我的课表</h1>
+            <p>陕西理工大学 · 课表自动推送</p>
+          </div>
         </div>
-        <span class="sync-note">每日 07:00 自动更新</span>
+        <span class="sync-note"><i class="live-dot" aria-hidden="true"></i>每日 07:00 自动更新</span>
       </header>
 
       <section class="hero glass">
-        <div>
+        <div class="hero-main">
           <p id="hero-eyebrow" class="eyebrow"></p>
           <h2 id="hero-title">今天的安排</h2>
           <p id="hero-date" class="hero-date"></p>
+          <ul id="hero-next" class="hero-next"></ul>
         </div>
         <div class="week-card">
-          <span>当前教学周</span>
+          <span class="week-card-label">当前教学周</span>
           <strong id="hero-week">第 1 周</strong>
-          <div class="progress"><i id="week-progress"></i></div>
+          <div class="progress" role="presentation"><i id="week-progress"></i></div>
           <small id="week-progress-label"></small>
         </div>
       </section>
 
       <div class="toolbar">
-        <div class="segmented glass" role="tablist">
-          <button class="view-tab active" data-view="today" role="tab">今日</button>
-          <button class="view-tab" data-view="week" role="tab">周课表</button>
+        <div class="segmented glass" role="tablist" aria-label="视图切换">
+          <button class="view-tab active" data-view="today" role="tab" aria-selected="true">今日</button>
+          <button class="view-tab" data-view="week" role="tab" aria-selected="false">周课表</button>
         </div>
         <div class="week-nav glass">
-          <button id="prev-week" class="week-arrow" type="button" aria-label="上一周">‹</button>
+          <button id="prev-week" class="week-arrow" type="button" aria-label="上一周">
+            <svg class="icon"><use href="#i-prev"></use></svg>
+          </button>
           <button id="week-label" class="week-current" type="button" title="回到本周">第 1 周</button>
-          <button id="next-week" class="week-arrow" type="button" aria-label="下一周">›</button>
+          <button id="next-week" class="week-arrow" type="button" aria-label="下一周">
+            <svg class="icon"><use href="#i-next"></use></svg>
+          </button>
         </div>
       </div>
 
       <main>
         <div id="pane-today" class="content">
           <section class="panel glass">
-            <div class="panel-heading"><h3 id="today-heading">今天</h3><span id="today-count"></span></div>
+            <div class="panel-heading">
+              <h3 id="today-heading">今天</h3>
+              <span id="today-count"></span>
+            </div>
             <div id="today-list" class="course-list"></div>
           </section>
+
           <aside class="panel side-panel glass">
-            <h3>本周概览</h3>
+            <div class="panel-heading"><h3>本周概览</h3><span id="stats-week"></span></div>
             <div id="stats" class="stats"></div>
-            <div class="tip"><strong>小提示</strong><span>点击课程卡片查看完整信息，左右箭头可以切换教学周。</span></div>
+            <div id="busy" class="busy"></div>
           </aside>
         </div>
 
         <section id="pane-week" class="panel week-panel glass" hidden>
-          <div class="panel-heading"><h3 id="grid-heading">第 1 周课表</h3><span>点击课程查看详情</span></div>
-          <div class="grid-scroll"><table id="grid" class="schedule"></table></div>
+          <div class="panel-heading">
+            <h3 id="grid-heading">第 1 周课表</h3>
+            <span class="panel-hint">点课程看详情</span>
+          </div>
+          <div class="grid-scroll">
+            <table id="grid" class="schedule"></table>
+          </div>
           <p class="grid-hint">手机上可以左右滑动查看完整课表</p>
         </section>
       </main>
 
-      <footer class="footer"><span id="updated"></span><span>·</span><span id="semester"></span></footer>
+      <footer class="footer">
+        <span id="updated"></span><span class="dot" aria-hidden="true">·</span><span id="semester"></span>
+      </footer>
     </div>
   </div>
 
   <div id="sheet" class="sheet" hidden>
     <div class="sheet-mask" data-close></div>
     <section class="sheet-card glass" role="dialog" aria-modal="true" aria-labelledby="sheet-name">
-      <button class="sheet-close" data-close type="button" aria-label="关闭">×</button>
+      <button class="sheet-close" data-close type="button" aria-label="关闭">
+        <svg class="icon"><use href="#i-close"></use></svg>
+      </button>
+      <p class="sheet-tag" id="sheet-tag"></p>
       <h2 id="sheet-name"></h2>
-      <dl class="detail-list"><dt>时间</dt><dd id="sheet-when"></dd><dt>教室</dt><dd id="sheet-room"></dd><dt>教师</dt><dd id="sheet-teacher"></dd><dt>周次</dt><dd id="sheet-weeks"></dd></dl>
+      <ul class="meetings" id="sheet-meetings"></ul>
+      <dl class="detail-list">
+        <dt><svg class="icon"><use href="#i-pin"></use></svg>教室</dt>
+        <dd id="sheet-room"></dd>
+        <dt><svg class="icon"><use href="#i-user"></use></svg>教师</dt>
+        <dd id="sheet-teacher"></dd>
+        <dt><svg class="icon"><use href="#i-calendar"></use></svg>周次</dt>
+        <dd id="sheet-weeks"></dd>
+      </dl>
     </section>
   </div>
 
-  <script src="/static/app.js?v=20260930.8"></script>
+  <script src="/static/app.js?v=20261012.3"></script>
 </body>
 </html>

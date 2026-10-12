@@ -80,3 +80,6 @@ desktop.ini
 
 # 本地预览产物
 .tmp-test/
+
+# 前端改版的回滚备份（.backup-web-<日期>/）
+.backup-web-*/
