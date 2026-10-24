@@ -48,15 +48,14 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from urllib3.exceptions import InsecureRequestWarning
 
+from .auth_http import HTTPClient, ThrottledAdapter, USER_AGENT
+from .login_page import extract_error, is_eams_url, parse_login_page
+from . import session_store
+
 logger = logging.getLogger(__name__)
 
 # 学校 encrypt.js 里的 $aes_chars：刻意去掉了 I/L/O/U/V 等易混字符
 AES_CHARS = "ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678"
-
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-)
 
 
 class AuthError(Exception):
@@ -95,111 +94,8 @@ def encrypt_password(password, salt):
     return base64.b64encode(ciphertext).decode("ascii")
 
 
-class ThrottledAdapter(HTTPAdapter):
-    """请求适配器：限速 + 协议纠正。
-
-    **限速**：学校 EAMS 有防刷机制，短时间内的密集请求会返回
-    "请不要过快点击" 的提示页而不是真实数据。挂在 Session 上后，
-    **所有**经该 Session 发出的请求都会自动保持最小间隔，
-    不会因为某处漏加延时而触发风控。
-
-    **协议纠正**：学校 EAMS 返回的 302 会把统一认证地址写成
-    ``http://authserver.snut.edu.cn/...``（80 端口），但该端口不可达，
-    只有 https(443) 可用。若照此重定向，requests 会一直卡到超时
-    （报 WinError 10060）。因此这里把指向 authserver 的 http 请求
-    统一提升为 https。
-    """
-
-    #: 需要强制走 https 的主机前缀
-    FORCE_HTTPS_PREFIX = "http://authserver.snut.edu.cn"
-
-    def __init__(self, min_interval, max_retries=3):
-        self.min_interval = max(0.0, float(min_interval or 0))
-        self._last_at = 0.0
-        # 学校服务器响应慢且偶尔抽风，配上退避重试
-        retry_kwargs = dict(
-            total=max_retries,
-            connect=max_retries,
-            read=max_retries,
-            backoff_factor=1.5,          # 重试前分别等 1.5s / 3s / 6s
-            status_forcelist=[500, 502, 503, 504],
-        )
-        methods = frozenset(["GET", "POST"])
-        try:
-            # urllib3 >= 1.26 的写法
-            retry = Retry(allowed_methods=methods, **retry_kwargs)
-        except TypeError:
-            # urllib3 <= 1.25 里这个参数叫 method_whitelist（默认不含 POST，
-            # 而取课表用的正是 POST，必须显式加上，否则失败不会重试）
-            retry = Retry(method_whitelist=methods, **retry_kwargs)
-        super(ThrottledAdapter, self).__init__(max_retries=retry)
-
-    def send(self, request, **kwargs):
-        if request.url.startswith(self.FORCE_HTTPS_PREFIX):
-            request.url = "https://" + request.url[len("http://"):]
-
-        if self.min_interval > 0:
-            waited = time.time() - self._last_at
-            if waited < self.min_interval:
-                time.sleep(self.min_interval - waited)
-        try:
-            return super(ThrottledAdapter, self).send(request, **kwargs)
-        finally:
-            self._last_at = time.time()
-
-
-class LoginClient(object):
-    """封装 CAS 登录与 EAMS 会话。"""
-
-    def __init__(self, config):
-        self.config = config
-        self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "User-Agent": USER_AGENT,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-            }
-        )
-        # 全局限速：所有请求都自动保持间隔
-        self.session.mount(
-            "http://", ThrottledAdapter(getattr(config, "request_interval", 0))
-        )
-        self.session.mount(
-            "https://", ThrottledAdapter(getattr(config, "request_interval", 0))
-        )
-        # 学校服务器的 SSL 证书若不被信任，下面的 _request 会自动降级
-        self._ssl_verify = True
-
-    # ------------------------------------------------------------------
-    # 底层请求
-    # ------------------------------------------------------------------
-
-    def _request(self, method, url, **kwargs):
-        """统一请求入口。
-
-        限速由挂在 Session 上的 ThrottledAdapter 自动完成。
-        学校服务器的证书链可能不完整，首次遇到 SSL 错误时自动降级为
-        不校验证书并重试一次，同时打印提示。
-        """
-        kwargs.setdefault("timeout", self.config.http_timeout)
-        kwargs.setdefault("verify", self._ssl_verify)
-
-        try:
-            return self.session.request(method, url, **kwargs)
-        except requests.exceptions.SSLError:
-            if not self._ssl_verify:
-                raise
-            logger.warning(
-                "SSL 证书校验失败，已降级为不校验证书重试（仅影响本机到学校的连接）"
-            )
-            self._ssl_verify = False
-            kwargs["verify"] = False
-            return self.session.request(method, url, **kwargs)
-
-    # ------------------------------------------------------------------
-    # 登录
-    # ------------------------------------------------------------------
+class LoginClient(HTTPClient):
+    """CAS login orchestration: saved cookies, silent SSO, full login."""
 
     def _fetch_login_page(self, service):
         """GET 登录页并解析出必要字段。"""
@@ -215,30 +111,7 @@ class LoginClient(object):
                 "请等待几分钟后重试，或调大 .env 中的 REQUEST_INTERVAL。"
             )
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        def field(element_id):
-            node = soup.find("input", {"id": element_id})
-            if node is None:
-                node = soup.find("input", {"name": element_id})
-            return (node.get("value") or "").strip() if node else ""
-
-        # 登录页里**同时存在多套表单**（生物识别 / 短信 / 账号密码 / 扫码），
-        # 每套都有自己的 cllt 隐藏值，而它们的 id 是重复的。HTML 中第一个
-        # id="cllt" 属于生物识别表单（value="fidoLogin"），用 soup.find 取第一个
-        # 会拿到错误的值，服务端会按生物识别流程处理并返回"认证失败"。
-        # 因此这里**不解析 cllt，直接锁定账号密码登录**，
-        # 与学校 login.js 中 cllt=='userNameLogin' 的分支保持一致。
-        cllt = "userNameLogin"
-        dllt = "generalLogin"
-
-        params = {
-            "execution": field("execution"),
-            "pwdEncryptSalt": field("pwdEncryptSalt"),
-            "lt": field("lt"),
-            "cllt": cllt,
-            "dllt": dllt,
-        }
+        params, has_captcha = parse_login_page(resp.text)
 
         if not params["execution"]:
             # 保存现场，便于事后分析到底是改版还是被限流
@@ -256,11 +129,6 @@ class LoginClient(object):
                 % saved
             )
 
-        # 页面上始终存在验证码容器，但 <img id="captchaImg"> 初始**没有 src**，
-        # 只有服务端真正要求验证码时才会由 JS 填入图片地址。
-        # 所以判断依据是"有没有 src"，而不是"有没有这个标签"。
-        captcha_img = soup.find("img", {"id": "captchaImg"})
-        has_captcha = bool(captcha_img and (captcha_img.get("src") or "").strip())
         return params, resp.text, has_captcha
 
     # ------------------------------------------------------------------
@@ -433,72 +301,14 @@ class LoginClient(object):
         return self.config.session_dir / "cookies.json"
 
     def save_session(self):
-        """把当前会话 Cookie 写入 .session/cookies.json。
-
-        必须连 **domain 一起保存**。早期版本只存 name/value，
-        恢复时 Cookie 因缺少归属域而无法正确发送。
-        其中 CAS 的 ``CASTGC`` 尤其重要——它代表统一认证端的登录状态，
-        只要它有效就能免密换到新的 EAMS 会话。
-        """
-        cookies = [
-            {
-                "name": c.name,
-                "value": c.value,
-                "domain": c.domain or "",
-                "path": c.path or "/",
-            }
-            for c in self.session.cookies
-        ]
-        data = {
-            "saved_at": time.time(),
-            "host": urlparse(self.config.eams_base).hostname,
-            "cookies": cookies,
-        }
-        try:
-            self._session_file.parent.mkdir(parents=True, exist_ok=True)
-            self._session_file.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            names = [c["name"] for c in cookies]
-            logger.debug("会话已保存（%d 个 Cookie：%s）", len(cookies), names)
-        except OSError as exc:
-            logger.warning("保存会话失败：%s", exc)
+        """Persist cookies with their domains and paths."""
+        return session_store.save_session(
+            self.session, self._session_file, self.config.eams_base
+        )
 
     def load_session(self):
-        """从文件恢复会话，返回是否成功读到可用数据。"""
-        if not self._session_file.exists():
-            return False
-        try:
-            data = json.loads(self._session_file.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            logger.debug("读取会话文件失败：%s", exc)
-            return False
-
-        raw = data.get("cookies")
-        if not raw:
-            return False
-
-        count = 0
-        if isinstance(raw, dict):
-            # 兼容早期格式（只有 name/value，没有 domain）
-            for name, value in raw.items():
-                self.session.cookies.set(name, value)
-                count += 1
-        else:
-            for item in raw:
-                try:
-                    kwargs = {}
-                    if item.get("domain"):
-                        kwargs["domain"] = item["domain"]
-                    if item.get("path"):
-                        kwargs["path"] = item["path"]
-                    self.session.cookies.set(item["name"], item["value"], **kwargs)
-                    count += 1
-                except (KeyError, TypeError):
-                    continue
-
-        logger.debug("已从文件恢复 %d 个 Cookie", count)
-        return count > 0
+        """Restore saved cookies, including the legacy format."""
+        return session_store.load_session(self.session, self._session_file)
 
     def silent_sso_login(self):
         """尝试用已有的 CAS 票据静默登录（不需要密码，也不需要验证码）。
@@ -522,9 +332,7 @@ class LoginClient(object):
             logger.debug("静默登录请求异常：%s", exc)
             return False
 
-        final_host = (urlparse(resp.url).hostname or "").lower()
-        eams_host = (urlparse(self.config.eams_base).hostname or "").lower()
-        if eams_host and final_host == eams_host:
+        if is_eams_url(resp.url, self.config.eams_base):
             logger.info("静默登录成功：CAS 票据仍有效，已换到新的 EAMS 会话")
             return True
 
@@ -547,17 +355,16 @@ class LoginClient(object):
         :raises CaptchaRequired: 需要图形验证码且无法自动解决
         :raises AuthError: 登录失败
         """
-        if not force:
-            if self.load_session():
-                if self.is_logged_in():
-                    logger.info("复用已保存的会话，无需重新登录")
-                    return self.session
+        if not force and self.load_session():
+            if self.is_logged_in():
+                logger.info("复用已保存的会话，无需重新登录")
+                return self.session
 
-                logger.debug("EAMS 会话已过期，尝试用 CAS 票据静默登录")
-                if self.silent_sso_login() and self.is_logged_in():
-                    self.save_session()
-                    return self.session
-                logger.debug("静默登录未能恢复会话")
+            logger.debug("EAMS 会话已过期，尝试用 CAS 票据静默登录")
+            if self.silent_sso_login() and self.is_logged_in():
+                self.save_session()
+                return self.session
+            logger.debug("静默登录未能恢复会话")
 
         logger.info("需要完整的账号密码登录")
         if solver is not None:
@@ -580,43 +387,11 @@ class LoginClient(object):
         ``authserver.../login?service=...%2Feams%2F...``，其中 service 参数
         里也含有 "eams" 字样，用 ``"eams" in url`` 判断会永远误判为成功。
         """
-        final_host = (urlparse(resp.url).hostname or "").lower()
-        eams_host = (urlparse(self.config.eams_base).hostname or "").lower()
-        if eams_host and final_host == eams_host:
-            return False
-        return True
+        return not is_eams_url(resp.url, self.config.eams_base)
 
     @staticmethod
     def _extract_error(html, final_url=""):
-        """从登录页 HTML 中提取错误提示。"""
-        soup = BeautifulSoup(html, "html.parser")
-
-        selectors = (
-            "#msg", "#errorMsg", ".alert-error", "#showErrorTip",
-            ".login-error", "#formErrorTip", "#errorDiv", ".error-tip",
-            "#showMsg", ".form-error", "#msgTips",
-        )
-        for selector in selectors:
-            node = soup.select_one(selector)
-            if node:
-                text = node.get_text(" ", strip=True)
-                if text:
-                    return "登录失败：%s" % text
-
-        # 金智的提示常常直接写在页面文本里
-        text = soup.get_text(" ", strip=True)
-        for keyword in ("用户名或密码", "密码错误", "密码有误", "账号或密码",
-                        "用户不存在", "账号被锁定", "账户被锁定", "验证码"):
-            idx = text.find(keyword)
-            if idx >= 0:
-                snippet = text[max(0, idx - 30): idx + 50].strip()
-                return "登录失败：…%s…" % snippet
-
-        host = urlparse(final_url).hostname or final_url
-        return (
-            "登录失败：提交后仍停留在 %s，页面里没有找到明确的错误提示。"
-            "请查看 logs/debug_login_failed.html 分析。" % host
-        )
+        return extract_error(html, final_url)
 
     # ------------------------------------------------------------------
     # 会话校验
