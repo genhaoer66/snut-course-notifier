@@ -142,21 +142,19 @@ def push(config, subject, text_body, html_body=None, raise_on_error=False):
     sent = []
     errors = []
 
-    if config.mail_enabled:
+    channels = (
+        ("mail", "邮件", send_mail, (config, subject, text_body, html_body)),
+        ("serverchan", "微信", send_serverchan, (config, subject, text_body)),
+    )
+    for name, label, send, args in channels:
+        if not getattr(config, name + "_enabled"):
+            continue
         try:
-            send_mail(config, subject, text_body, html_body)
-            sent.append("mail")
+            send(*args)
+            sent.append(name)
         except NotifyError as exc:
-            logger.error("邮件推送失败：%s", exc)
-            errors.append(("mail", exc))
-
-    if config.serverchan_enabled:
-        try:
-            send_serverchan(config, subject, text_body)
-            sent.append("serverchan")
-        except NotifyError as exc:
-            logger.error("微信推送失败：%s", exc)
-            errors.append(("serverchan", exc))
+            logger.error("%s推送失败：%s", label, exc)
+            errors.append((name, exc))
 
     if not sent and not errors:
         raise NotifyError(

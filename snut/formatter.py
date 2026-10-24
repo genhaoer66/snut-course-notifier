@@ -62,10 +62,6 @@ def format_day_text(table, target, week=None, title_prefix="今日课表"):
 
 def format_week_text(table, week, title_prefix="本周课表"):
     """把一整个教学周格式化成纯文本。"""
-    today = datetime.date.today()
-    # 找到该周周一的日期（仅用于标题展示，按当前日期粗略推算）
-    monday = today - datetime.timedelta(days=today.weekday())
-
     lines = ["%s | 第%d周" % (title_prefix, week)]
     lines.append("-" * 34)
 

@@ -12,7 +12,6 @@
 
 import argparse
 import datetime
-import json
 import logging
 import sys
 
@@ -20,12 +19,11 @@ from .auth import AuthError, CaptchaRequired, LoginClient
 from .captcha import CaptchaSolver
 from .config import ConfigError, get_config
 from .course import CourseError, load_course_table
-from .formatter import current_week_from_start, format_day_html, format_day_text
+from .formatter import (
+    WEEKDAY_CN, current_week_from_start, format_day_html, format_day_text,
+)
 from .notify import NotifyError, push, send_alert
 from .snapshot import save_snapshot
-
-WEEKDAY_CN = ["一", "二", "三", "四", "五", "六", "日"]
-
 
 def setup_logging(config, verbose=False):
     """配置日志：同时输出到控制台和 logs/course.log。"""
