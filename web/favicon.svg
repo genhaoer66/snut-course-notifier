@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="我的课表">
+  <!-- 由 web/logo.svg 生成，别直接改这个文件。改完源文件跑 scripts/make_brand_assets.py。 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#203170"/>
+      <stop offset="1" stop-color="#4a63c0"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".22"/>
+      <stop offset=".55" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <rect width="64" height="64" rx="14" fill="url(#sheen)"/>
+  <path fill="#ffffff" fill-opacity=".95"
+        d="M17 28.6c8.1 0 12.6-3.2 15-11.3 2.4 8.1 6.9 11.3 15 11.3 1.9 0 3.5-.3 4.8-1-1.1 9.9-9.1 17.1-19.8 17.1-10.9 0-19-7.1-20-16.1z"/>
+  <path fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="3.4" stroke-linecap="round"
+        d="M20.5 40.2c6.6 1.8 18.4 1.8 24 0"/>
+</svg>

@@ -7,8 +7,40 @@
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#eef1fa" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1224" media="(prefers-color-scheme: dark)">
-  <title>我的课表</title>
+  <title>我的课表 · 陕西理工大学</title>
+
+  <!--
+    站点图标：内联 SVG 保底（页面零外部请求），但书签栏和 iOS「添加到主屏幕」
+    只认站点自己的文件，下面的 ico / png 才是它们实际在用的。
+    源文件是 web/logo.svg，导出命令见该文件顶部注释。
+  -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23203170'/><path fill='none' stroke='white' stroke-width='2' stroke-linecap='round' d='M8 18c4 0 6-2 8-6 2 4 4 6 8 6M9 23c3 1 11 1 14 0'/></svg>">
+  <!-- 有 ICO 时浏览器优先用 ICO（书签栏、老版 Edge 都稳），SVG 作为高清兜底 -->
+  <link rel="icon" type="image/x-icon" href="static/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="icon" type="image/svg+xml" href="static/favicon.svg" sizes="any">
+  <link rel="apple-touch-icon" href="static/apple-touch-icon.png">
+
+  <!--
+    分享卡片（X / 微信 / QQ / Telegram）。**必须是绝对 URL + PNG**：
+    X 的爬虫不会把相对路径拼到站点上，SVG 它也不渲染。
+    {OG_BASE} 由 snut/webapp.py 的 `/` 路由替换（线上 https://060131.xyz，
+    本地预览空串）。换域名设环境变量 SNUT_OG_BASE，别在这里手改。
+  -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="我的课表">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="我的课表 · 陕西理工大学">
+  <meta property="og:description" content="每天早上 7 点自动推送当天的课表到手机，网页上随时查看今日安排与整周课表。一次抓取，两个产物。">
+  <meta property="og:url" content="{OG_BASE}/">
+  <meta property="og:image" content="{OG_BASE}/static/og-cover.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="我的课表 —— 每天 07:00 自动推送课表">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="我的课表 · 陕西理工大学">
+  <meta name="twitter:description" content="每天早上 7 点自动推送当天的课表到手机，网页上随时查看今日安排与整周课表。">
+  <meta name="twitter:image" content="{OG_BASE}/static/og-cover.png">
 
   <!-- 全部图标与鲸鱼标记都内联在此，页面不请求任何外部资源 -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">

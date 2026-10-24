@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="我的课表 —— 陕西理工大学课表自动推送">
+  <!--
+    X / 微信分享卡片的源文件（1200×630，summary_large_image 标准尺寸）。
+    发布用的一定是 scripts/make_brand_assets.py 导出的 og-cover.png，
+    不是这个 SVG —— X 的爬虫不认 SVG。
+
+    排版三条约束：
+      1. 四周 60px 是裁切安全区；手机端时间线会裁掉左右约 10%。
+         所以正文全部落在 x ∈ [84, 1116]，y ∈ [84, 546]。
+      2. 浏览器 / X 的图片查看器不会给你装中文字体，所以 SVG 里用
+         font-family 列一串系统字体；PNG 由本地脚本渲染，字体跟着本机走。
+      3. 深底色 + 纯白字，缩到 300px 宽的缩略图里仍然能读出来。
+
+    背景那条曲线是「课表网格」的暗示：一条折线从左上斜穿到右下，
+    在鲸鱼的尾巴处折一次 —— 和 favicon 那只鲸鱼是同一笔。
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2a63"/>
+      <stop offset=".55" stop-color="#3a52b0"/>
+      <stop offset="1" stop-color="#4a63c0"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a3c85"/>
+      <stop offset="1" stop-color="#4a63c0"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".18"/>
+      <stop offset=".55" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#sheen)"/>
+
+  <!-- 课表网格：极淡的线条，不出安全区 -->
+  <g stroke="#ffffff" stroke-opacity=".07" stroke-width="1">
+    <path d="M84 210H1116M84 330H1116M84 450H1116"/>
+    <path d="M180 84V546M460 84V546M740 84V546M1020 84V546"/>
+  </g>
+
+  <!-- 时间轴：一条折线，末端在鲸鱼尾部收成圆点 -->
+  <path d="M84 420H420L560 300" fill="none" stroke="#ffffff" stroke-opacity=".22"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="560" cy="300" r="7" fill="#ffffff" fill-opacity=".55"/>
+
+  <!-- 左：站点图标（120×120）。底片用实色深蓝，免得和背景渐变撞成一片 -->
+  <g transform="translate(84 96)">
+    <rect width="120" height="120" rx="26" fill="#1b2a63"/>
+    <rect width="120" height="120" rx="26" fill="url(#chip)"/>
+    <g transform="translate(18 18) scale(1.3125)">
+      <path fill="#ffffff" fill-opacity=".96"
+            d="M17 28.6c8.1 0 12.6-3.2 15-11.3 2.4 8.1 6.9 11.3 15 11.3 1.9 0 3.5-.3 4.8-1-1.1 9.9-9.1 17.1-19.8 17.1-10.9 0-19-7.1-20-16.1z"/>
+      <path fill="none" stroke="#ffffff" stroke-opacity=".60" stroke-width="3.4"
+            stroke-linecap="round" d="M20.5 40.2c6.6 1.8 18.4 1.8 24 0"/>
+    </g>
+  </g>
+
+  <!-- 右：站点名 + 一句话 -->
+  <g font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Source Han Sans SC',system-ui,sans-serif"
+     fill="#ffffff">
+    <text x="238" y="146" font-size="30" font-weight="600" fill-opacity=".72"
+          letter-spacing="2">SNUT · COURSE SHEET</text>
+    <text x="236" y="226" font-size="76" font-weight="700" letter-spacing="-1">我的课表</text>
+    <text x="238" y="278" font-size="28" font-weight="400" fill-opacity=".78"
+          letter-spacing="1">陕西理工大学 · 课表自动推送</text>
+  </g>
+
+  <!-- 域名：紧跟在副标题后面，做成一条细线 + 小字，不抢主标题 -->
+  <g font-family="'SF Mono',ui-monospace,Consolas,'Noto Sans Mono',monospace">
+    <path d="M238 300H760" stroke="#ffffff" stroke-opacity=".18" stroke-width="1"/>
+    <text x="238" y="336" font-size="24" fill="#ffffff" fill-opacity=".60" letter-spacing="1">060131.xyz</text>
+  </g>
+
+  <!-- 主标语：两行，第二行压成半透明当副标题 -->
+  <g font-family="'PingFang SC','Microsoft YaHei','Noto Sans CJK SC','Source Han Sans SC',system-ui,sans-serif">
+    <text x="84" y="500" font-size="42" font-weight="700" fill="#ffffff" letter-spacing="1">
+      每天 07:00 自动推送课表
+    </text>
+    <text x="84" y="552" font-size="25" fill="#ffffff" fill-opacity=".72" letter-spacing=".5">
+      一次抓取，两个产物：手机上收邮件，网页上随时看今日与整周
+    </text>
+  </g>
+</svg>

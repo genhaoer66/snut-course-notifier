@@ -23,6 +23,8 @@ import datetime
 import hashlib
 import hmac
 import logging
+import os
+import re
 import time
 
 from fastapi import FastAPI, Request
@@ -30,6 +32,7 @@ from fastapi.responses import (
     FileResponse,
     JSONResponse,
     PlainTextResponse,
+    Response,
 )
 from fastapi.staticfiles import StaticFiles
 
@@ -188,15 +191,67 @@ async def add_noindex_header(request: Request, call_next):
 # ----------------------------------------------------------------------
 
 
+# ---- 分享卡片：og:url / og:image 的站点根 ----
+#: index.html 里写的是 ``{OG_BASE}`` 占位符，渲染时替换成这里的值。
+OG_BASE_TOKEN = b"{OG_BASE}"
+OG_BASE_ENV = "SNUT_OG_BASE"
+DEFAULT_OG_BASE = "https://060131.xyz"
+
+
+def _og_base(request: Request) -> str:
+    """卡片标签用的站点根：末尾不带斜杠。
+
+    优先级：显式配置 > 浏览器地址栏里的 Host > 默认域名。
+
+    为什么不无脑用 ``request.base_url``：Cloudflare 隧道转发过来时
+    ``request.url`` 看到的是 ``http://127.0.0.1:8000``，拼出来的图地址
+    公网根本打不开，卡片就成了白板。所以默认值走 ``SNUT_OG_BASE`` 或内置
+    域名，**只在本地预览时**才退回请求自身的地址。
+    """
+    configured = os.environ.get(OG_BASE_ENV, "").strip().rstrip("/")
+    if configured:
+        return configured
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    if host in ("127.0.0.1", "localhost", "[::1]") or host.endswith(".local"):
+        return ""  # 本地预览：相对路径，浏览器自己拼
+    if host:
+        # 经 Cloudflare 隧道进来的请求一定是 https，xff 头是判断依据
+        scheme = "https" if request.headers.get("x-forwarded-proto", "https") == "https" else "http"
+        return "%s://%s" % (scheme, host)
+    return DEFAULT_OG_BASE
+
+
+def _render_index(raw: bytes, base: str) -> bytes:
+    """把 index.html 里的 ``{OG_BASE}`` 换成站点根。
+
+    只做一次字节替换，不引模板引擎：这个页面是纯静态的，
+    上模板反而多一层可能出错的依赖。
+
+    只在标签内部替换（先 ``content="`` 再 ``{OG_BASE}``），JS 注释或
+    说明文字里出现的同样字样不会被误伤。
+    """
+    return re.sub(
+        rb'(content=")\{OG_BASE\}', lambda m: m.group(1) + base.encode("utf-8"), raw
+    )
+
+
 @app.api_route("/", methods=["GET", "HEAD"])
-async def index():
+async def index(request: Request):
     config, error = _config_or_error()
     if error:
         return error
-    return FileResponse(
-        str(config.web_dir / "index.html"),
-        media_type="text/html; charset=utf-8",
-    )
+    body = _render_index(_read_index(config.web_dir / "index.html"), _og_base(request))
+    if request.method == "HEAD":
+        return Response(media_type="text/html; charset=utf-8",
+                        headers={"Content-Length": str(len(body))})
+    return Response(content=body, media_type="text/html; charset=utf-8")
+
+
+def _read_index(path) -> bytes:
+    """读 index.html。文件只有十几 KB，不缓存也够快；缓存反而会在
+    「改了页面没重启服务」时给出旧内容，踩过一次就不想再踩。"""
+    with open(str(path), "rb") as fh:
+        return fh.read()
 
 
 @app.api_route("/api/timetable", methods=["GET", "HEAD"])
