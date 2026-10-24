@@ -20,12 +20,10 @@
 """
 
 import datetime
-import hashlib
 import hmac
 import logging
 import os
 import re
-import time
 
 from fastapi import FastAPI, Request
 from fastapi.responses import (
@@ -39,15 +37,20 @@ from fastapi.staticfiles import StaticFiles
 from .config import ROOT_DIR, ConfigError, get_config
 from .formatter import current_week_from_start
 from .snapshot import load_snapshot
+from .web_security import (
+    LOCKOUT_SECONDS,
+    MAX_LOGIN_FAILURES,
+    TOKEN_TTL_DAYS,
+    _bearer,
+    _client_ip,
+    _failures,
+    _lockout_remaining,
+    _record_failure,
+    issue_token,
+    verify_token,
+)
 
 logger = logging.getLogger(__name__)
-
-#: token 有效期（天）。同学手机上输一次口令，这段时间内不用再输。
-TOKEN_TTL_DAYS = 30
-
-#: 同一个 IP 连续输错多少次口令后暂时锁定
-MAX_LOGIN_FAILURES = 8
-LOCKOUT_SECONDS = 300
 
 app = FastAPI(
     title="课表",
@@ -74,100 +77,13 @@ def _config():
 
 def _config_or_error():
     try:
-        return get_config(), None
+        return _config(), None
     except ConfigError as exc:
         logger.error("配置有问题：%s", exc)
         return None, JSONResponse(
             {"error": "服务端配置缺失", "code": "config"}, status_code=500
         )
 
-
-# ----------------------------------------------------------------------
-# 口令与 token
-# ----------------------------------------------------------------------
-#
-# 无状态设计：token 就是「签发日期 + HMAC 签名」，服务端不存 session。
-# 好处是重启服务、甚至换机器，同学手上的 token 都还有效。
-# 密钥用口令本身，不知道口令就伪造不出签名。
-
-
-def issue_token(secret, now=None):
-    """签发 token，形如 ``2026-09-25.3f2a...``。"""
-    day = (now or datetime.date.today()).isoformat()
-    sig = hmac.new(
-        secret.encode("utf-8"), day.encode("utf-8"), hashlib.sha256
-    ).hexdigest()
-    return "%s.%s" % (day, sig)
-
-
-def verify_token(secret, token, now=None):
-    """校验 token 是否有效且未过期。"""
-    if not token or "." not in token:
-        return False
-    day, _, sig = token.rpartition(".")
-    today = now or datetime.date.today()
-    for offset in range(TOKEN_TTL_DAYS):
-        candidate = today - datetime.timedelta(days=offset)
-        if candidate.isoformat() != day:
-            continue
-        expected = hmac.new(
-            secret.encode("utf-8"), day.encode("utf-8"), hashlib.sha256
-        ).hexdigest()
-        # 用 compare_digest 而不是 ==，避免通过响应时间逐字节猜签名
-        return hmac.compare_digest(sig, expected)
-    return False
-
-
-def _bearer(request):
-    header = request.headers.get("authorization") or ""
-    if header.lower().startswith("bearer "):
-        return header[7:].strip()
-    return ""
-
-
-# ----------------------------------------------------------------------
-# 登录失败限速（内存态，单进程够用）
-# ----------------------------------------------------------------------
-
-_failures = {}
-
-
-def _client_ip(request):
-    """取真实客户端 IP。
-
-    请求经过 Cloudflare 隧道而来，``request.client.host`` 永远是 127.0.0.1，
-    所以读 Cloudflare 注入的 ``CF-Connecting-IP``。因为源站只监听回环、
-    只有 cloudflared 能连进来，这个头是可信的。
-    """
-    return request.headers.get("cf-connecting-ip") or (
-        request.client.host if request.client else "unknown"
-    )
-
-
-def _lockout_remaining(ip):
-    entry = _failures.get(ip)
-    if not entry:
-        return 0
-    count, first_at = entry
-    if count < MAX_LOGIN_FAILURES:
-        return 0
-    remaining = LOCKOUT_SECONDS - (time.time() - first_at)
-    if remaining <= 0:
-        _failures.pop(ip, None)
-        return 0
-    return int(remaining) + 1
-
-
-def _record_failure(ip):
-    count, first_at = _failures.get(ip, (0, time.time()))
-    if time.time() - first_at > LOCKOUT_SECONDS:
-        count, first_at = 0, time.time()
-    _failures[ip] = (count + 1, first_at)
-
-
-# ----------------------------------------------------------------------
-# 中间件：反搜索引擎收录
-# ----------------------------------------------------------------------
 
 #: 所有响应都带这个头。详见 robots.txt 路由里的说明。
 NOINDEX_HEADER = "noindex, nofollow, noarchive, nosnippet"
