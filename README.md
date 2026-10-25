@@ -152,7 +152,7 @@ docs/                 架构、设计规格与合成截图
 ## 测试
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements.txt -r requirements-dev.txt
 python -m unittest discover -s tests
 python -m compileall -q snut scripts tests
 node --check web/app.js

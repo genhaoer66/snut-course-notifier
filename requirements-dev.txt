@@ -1,2 +1,4 @@
-# Development and CI test dependencies
+# Development and CI test dependencies (used together with requirements.txt)
 pytest>=8.0
+# fastapi.testclient 依赖 httpx
+httpx>=0.27
