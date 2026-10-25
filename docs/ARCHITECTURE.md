@@ -1,136 +1,107 @@
 # 架构说明
 
-## 1. 运行时边界
-
-项目分为两个彼此隔离的运行时：
-
-### 抓取任务
-
-入口：`python -m snut.main`
-
-职责：
-
-1. 从配置读取学校账号和推送配置；
-2. 复用 Cookie 或执行 CAS 登录；
-3. 请求 EAMS 并解析 JavaScript 课表；
-4. 生成邮件 / Server酱消息；
-5. 通过 `snapshot.save_snapshot()` 写入脱敏快照。
-
-这个进程可以访问学校系统，也可以读取 `.env`。
-
-### Web 服务
-
-入口：`uvicorn snut.webapp:app`
-
-职责：
-
-1. 返回 `web/index.html`；
-2. 读取 `data/timetable.json`；
-3. 提供 `/api/timetable`、`/api/login` 和 `/healthz`；
-4. 提供静态前端资源。
-
-这个进程不导入 `auth`、`course`、`captcha`、`notify`，也不执行学校请求。它只读快照，因此网页访问量不会影响学校教务系统。
-
-## 2. 数据流
+## 运行时与数据流
 
 ```text
-.env
- │
- ▼
-Config ──> LoginClient ──> EAMS
-                         │
-                         ▼
-                    CourseTable
-                    /         \
-                   ▼           ▼
-             formatter      snapshot
-                │              │
-                ▼              ▼
-             邮件推送       timetable.json
-                                  │
-                                  ▼
-                          FastAPI /api/timetable
-                                  │
-                                  ▼
-                            浏览器本地渲染
+.env → Config → main
+                ├─ LoginClient（auth 门面）
+                │    ├─ HTTPClient / ThrottledAdapter（请求、限速、重试）
+                │    ├─ login_page（HTML 纯解析）
+                │    └─ session_store（Cookie 恢复与保存）
+                └─ course.load_course_table → CourseTable / Activity
+                                              ├─ formatter → notify → 邮件 / Server酱
+                                              └─ snapshot.save_snapshot
+                                                    │ 原子写入
+                                              data/timetable.json
+                                                    │ 只读
+                              webapp ← snapshot.load_snapshot
+                                ├─ web_security（访问令牌、登录限速）
+                                ├─ formatter（按当前日期计算周次）
+                                └─ web/ → 浏览器渲染与本地过滤
 ```
 
-前端一次请求全量课表，周次切换、按天过滤和表格渲染都在浏览器完成。切换周次不会增加 API 请求。
+一次抓取，两个产物：推送内容与网站快照。快照在推送前写入，所以推送失败不影响已生成的快照。
+`--dry-run` 仍登录、抓取和写快照，只跳过推送；`--no-snapshot` 才跳过快照写入。
+浏览器首次取得全量数据后，切周和课程过滤在本地完成，不增加学校请求。
 
-## 3. 文件职责
+## 模块职责
 
-| 文件 | 只负责什么 |
+| 模块 | 职责与边界 |
 |---|---|
-| `snut/config.py` | 读取并校验环境变量、集中管理路径 |
-| `snut/auth.py` | CAS 登录、AES 密码加密、Cookie 会话复用 |
-| `snut/course.py` | EAMS 请求、学期/学生 ID 提取、课表 JS 解析 |
-| `snut/captcha.py` | 可选验证码识别 |
-| `snut/formatter.py` | 邮件正文和周次计算 |
-| `snut/notify.py` | 邮件、Server酱推送 |
-| `snut/snapshot.py` | 公开字段白名单、原子写入、旧快照保护 |
-| `snut/main.py` | CLI 编排，不承载底层解析细节 |
-| `snut/webapp.py` | 只读快照的 HTTP API 和认证 |
-| `web/index.html` | DOM 骨架，不放业务数据 |
-| `web/style.css` | 视觉和响应式布局 |
-| `web/app.js` | API、周次过滤、渲染、交互 |
-| `scripts/` | 诊断和部署工具，不参与业务运行 |
+| `snut/config.py` | 加载环境变量，校验必填账号、数字与日期，提供目录和配置单例 |
+| `snut/auth.py` | 对外登录门面 `LoginClient`；AES 密码加密；Cookie 复用、静默 SSO、完整登录与验证码重试编排 |
+| `snut/auth_http.py` | `HTTPClient` 维护 requests 会话；`ThrottledAdapter` 限速、重试和认证 HTTP→HTTPS；处理 SSL 兼容降级 |
+| `snut/login_page.py` | 无网络的登录表单解析、验证码标记判断、错误提取和目标主机判定 |
+| `snut/session_store.py` | 保存 Cookie name/value/domain/path，兼容旧字典格式，处理缺失或损坏会话文件 |
+| `snut/course.py` | 学期与内部学生 ID 提取，EAMS 抓取、JavaScript 解析、排课合并，以及 `Activity` / `CourseTable` 数据模型 |
+| `snut/captcha.py` | 可选 OCR 初始化与验证码识别，不可用时提供降级原因 |
+| `snut/formatter.py` | 日/周文本与 HTML 格式化、教学周计算，不请求学校 |
+| `snut/notify.py` | SMTP 和 Server酱推送、启用渠道分发、告警与错误处理 |
+| `snut/snapshot.py` | 字段白名单、作息表读取、快照构造、原子保存与读取，不导入课表请求模块 |
+| `snut/main.py` | 参数解析、配置与日志、登录、抓取、快照、格式化和推送的顺序编排 |
+| `snut/web_security.py` | HMAC 令牌签发/校验、Bearer 提取、客户端 IP 与内存失败计数；不依赖 Web 框架 |
+| `snut/webapp.py` | FastAPI 路由、配置错误响应、快照读取、实时周次补充、分享标签、缓存与静态资源 |
+| `web/index.html` | DOM 与元信息骨架，不内嵌真实课表 |
+| `web/app.js` | 请求快照、状态管理、周次与课程过滤、渲染、键盘和弹层交互 |
+| `web/style.css` | 松石绿视觉、深浅色、响应式、打印和减弱动态效果 |
+| `scripts/` | 诊断和部署工具；`deploy_web.py` 收集后端模块与前端资源，`upload_frontend.py` 仅上传前端 |
 
-## 4. 失败策略
+## Web 边界与接口
 
-### 抓取失败
+`snut/webapp.py` **不得 import `auth` / `course` / `captcha`**，也不得调用学校接口。
+Web 只能读取落地快照，浏览器刷新不会触发登录或抓取。这条请求边界必须保持。
 
-- 保留上一次的 `data/timetable.json`；
-- cron 日志记录错误；
-- 正常运行模式尝试发送告警；
-- 网站继续展示旧快照，并在页脚标记更新时间。
+当前实现仍导入 `config.py`，该模块加载 `.env`；路由通过 `get_config()` 创建包含必填学校账号的通用 `Config`。
+因此目前隔离的是学校请求逻辑，而不是进程内凭证。不能宣称 Web 不读取 `.env` 或内存中没有账号密码。
+进一步拆分网站配置属于后续工作。
 
-### 邮件失败
+| 接口 | 行为 |
+|---|---|
+| `GET/HEAD /` | 读取 HTML，替换分享标签 `{OG_BASE}`，`Cache-Control: no-cache` |
+| `GET/HEAD /api/timetable` | 校验可选令牌、读取快照，补充实时 `current_week` 和 `server_today`；无快照返回 503 |
+| `POST /api/login` | 无口令时返回空令牌；否则校验口令、记录失败或签发令牌 |
+| `GET/HEAD /healthz` | 返回进程与快照概况；`ok` 不代表快照一定存在，应检查 `has_snapshot` |
+| `GET/HEAD /robots.txt` | 点名拒绝 AI 爬虫，允许搜索引擎读取 noindex 指令 |
+| `/static/` | 映射整个 `web/`，静态资源缓存 604800 秒，修改后需更新资源版本号 |
 
-邮件失败会返回非零状态，但不影响已经写入的网站快照。
+课表 API 有口令时缓存为 `private, max-age=300`，公开模式为 `public, max-age=600`。
+所有响应添加 `X-Robots-Tag`。网站令牌为日期加 HMAC，有效期 30 天；修改共享口令使旧签名失效。
+同 IP 在 300 秒窗口内累计 8 次错误后锁定至窗口结束，计数保存在进程内存，不是持久化或跨进程计数。
 
-### 快照失败
+## 快照与失败策略
 
-快照写入异常只记录日志，不阻止邮件推送。写入使用临时文件 + `os.replace`，避免网站读到半截 JSON。
+课程白名单为 `name`、`teachers`、`room`、`day`、`units`、`weeks`，排除学号、内部 ID、课程编码和学期 ID。
+根字段包含更新时间、学期起始日、每天节次数、可选作息表与课程列表。教师姓名仍在白名单内，快照不是完全匿名数据。
+不要改用 `vars()` 或 `__dict__` 整体导出，新字段应默认不公开。
 
-### 网站不可用
+- 快照先写临时文件，再用 `os.replace` 原子替换；失败时保留已有快照。
+- 抓取或登录失败会结束流程；非 dry-run 模式尝试发告警，网站继续读取旧快照。
+- 快照写入异常只记录日志，不阻止后续推送。
+- `notify.push()` 默认记录各渠道错误并继续其他渠道。没有配置渠道会抛错；已配置渠道发送失败默认不抛错，因此 CLI 不保证返回非零状态。
+- 快照缺失或 JSON 损坏时返回无数据提示。前端标注更新时间，旧数据不能当作抓取成功的证明。
+- `data/periods.json` 由快照构造时读取；修改后必须重新生成快照。未提供时前端只显示节次，不编造作息时间。
 
-systemd 自动重启 `course-web`；Cloudflare Tunnel 只把公网流量转发到本机 `127.0.0.1:8000`。
+## 六个学校系统的坑
 
-## 5. 安全边界
+金智 CAS 登录需要 AES-CBC/PKCS7 加密，树维 EAMS 返回的是 JavaScript，不是正方系统的接口。
 
-- 真实配置只放 `.env`，不进入 Git；
-- Cookie 只放 `.session/`，不进入 Git；
-- 快照只导出 `PUBLIC_FIELDS`；
-- Web 服务不持有教务登录凭证；
-- 源站服务只监听回环地址；
-- Cloudflare Tunnel 隐藏源站地址并负责 HTTPS；
-- 访问口令是共享口令，不是多用户账号系统；
-- 口令 token 是无状态 HMAC，默认 30 天有效；
-- 登录失败按客户端 IP 做内存限速；
-- 所有网页响应带 `X-Robots-Tag: noindex`。
+| 坑 | 处理位置与原则 |
+|---|---|
+| 多套登录表单 ID 重复，首个 `cllt` 可能属于生物识别 | `login_page.py` 固定 `cllt=userNameLogin`、`dllt=generalLogin` |
+| `startWeek=1` 只返回第 1 周 | `course.py` 传空串取整学期；不传会导致失败的 `project.id` |
+| `ids` 不是学号 | 从课表页 JS 现场提取内部学生记录 ID |
+| 周次位图容易偏移一周 | 下标 i 就是第 i 周，第 0 位只占位，不加 1 |
+| 落格索引容易偏移一节 | 星期与节次均从 0 开始，索引为 `星期 * unitCount + 节次` |
+| CAS 重定向到不通的 HTTP 80 端口 | `auth_http.ThrottledAdapter` 将学校认证主机请求提升为 HTTPS |
 
-## 6. 修改顺序
+这些约定来自既有学校实测记录与对应代码。请求间隔、Cookie domain/path 和旧版 urllib3 重试参数兼容同样不能随意删除。
+教学周起始日需按校历或调课通知维护；空白周可能是实训周，不能用来反推开学日。
 
-### 修改解析或登录
+## 维护与验证
 
-先运行：
+运行 `python -m unittest discover -s tests -v`、`python -m compileall -q snut scripts tests`、
+`node --check web/app.js` 与 `node tests/js/ui-selftest.js`。
+离线测试通过后，涉及学校行为的验证应另行在授权范围内低频执行，不能把单元测试等同于学校在线可用性。
 
-```bash
-python -m unittest discover -s tests -v
-python -m snut.main --dry-run
-```
-
-不要用真实推送命令反复调试，学校 EAMS 有请求限速。
-
-### 修改网页
-
-1. 修改 `web/index.html`、`web/style.css`、`web/app.js`；
-2. 执行 `node --check web/app.js`；
-3. 本地启动 Web 服务；
-4. 生产部署时上传前端并更新资源版本号；
-5. 不需要重新抓取课表。
-
-### 修改配置
-
-优先修改 `.env.example` 的说明，再在服务器的 `.env` 写真实值。不要把真实值反向复制回模板。
-
+界面规格见 [DESIGN.md](DESIGN.md)，入门与配置见 [README](../README.md)，
+部署见 [邮件运维](../DEPLOY.md) 和 [网站运维](../DEPLOY-WEB.md)。

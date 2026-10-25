@@ -1,7 +1,10 @@
 ﻿const fs = require('fs');
 const vm = require('vm');
+const path = require('path');
+const crypto = require('crypto');
+const root = path.resolve(__dirname, '../..');
 const assert = require('assert');
-const source = fs.readFileSync('web/app.js', 'utf8');
+const source = fs.readFileSync(path.join(root, 'web/app.js'), 'utf8');
 const context = {state: {data: {courses: []}}, WEEKDAYS: ['一','二','三','四','五','六','日']};
 vm.createContext(context);
 ['parseDate','dayNumber','weekdayIndex','weekOf','weekDates','unitText','weekText','coursesOn','meetingsOf','hueOf'].forEach(name => {
@@ -74,13 +77,12 @@ assert.equal(context.todayDate().getDate(),25); assert.equal(context.effectiveWe
 context.Date = class extends RealDate {constructor(...args) {super(...(args.length ? args : [2026,9,26,12]));}};
 assert.equal(context.effectiveWeek(),9);
 assert(!source.includes('innerHTML'));assert(!/\?\.|\?\?/.test(source));
-const html=fs.readFileSync('web/index.html','utf8');
+const html=fs.readFileSync(path.join(root, 'web/index.html'),'utf8');
 assert.equal((html.match(/content="\{OG_BASE\}/g)||[]).length,3);
 assert(html.includes('/static/style.css?v=20261024.1'));
 assert(html.includes('/static/app.js?v=20261024.1'));
-const oldSource = require('child_process').execFileSync('git',['show','HEAD:web/app.js'],{encoding:'utf8'});
 const poem = text => text.match(/  var POEMS = \[[\s\S]*?\n  \];/)[0].replace(/\r/g,'');
-assert.equal(poem(source),poem(oldSource));
+assert.equal(crypto.createHash('sha256').update(poem(source)).digest('hex'), 'cdff7e2f7dc177d7d77e0d5b2ca0ec4101736ab3aa2be547bc03bbaf186257c5');
 console.log('跨周、首末周、8 色哈希、时间字段、跨零点、资源约定与完整诗句数组自测通过');
 
 function extract(name, target) {

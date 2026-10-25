@@ -28,3 +28,5 @@ jobs:
           node-version: 20
       - name: Check JavaScript syntax
         run: node --check web/app.js
+      - name: Run frontend logic tests
+        run: node tests/js/ui-selftest.js

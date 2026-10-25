@@ -52,19 +52,18 @@ cd /path/to/course-notifier
 SNUT_SSH_HOST='<服务器地址>' SNUT_SSH_PASS='<服务器密码>' python scripts/remote.py "!ls -la"
 ```
 
-需要上传的文件：
+需要上传当前版本的全部相关文件，避免拆分模块或新增图标漏传：
 
-| 新增 | 说明 |
+| 文件 | 说明 |
 |---|---|
-| `snut/snapshot.py` | 课表快照的脱敏与读写 |
-| `snut/webapp.py` | 网站后端 |
-| `web/` | 前端（index.html / app.js / style.css） |
+| `snut/` 下全部 `.py` | 包括 `auth_http.py`、`login_page.py`、`session_store.py`、`web_security.py` 等拆分模块 |
+| `web/` 下全部文件 | HTML、CSS、JS、SVG、favicon、触摸图标与分享封面 |
 | `deploy/course-web.service` | systemd 服务单元 |
+| `DEPLOY-WEB.md` | 网站运维说明 |
 
-| 修改 | 说明 |
-|---|---|
-| `snut/config.py` | 新增 `web_password` / `data_dir` |
-| `snut/main.py` | 抓完顺手存快照 |
+`scripts/deploy_web.py` 自动收集上述文件并完成部署；它还会运行一次抓取以生成快照。
+仅更新前端时可使用 `scripts/upload_frontend.py`，上传 `web/` 下全部文件，不抓取课表。
+修改 CSS/JS 后应同步更新 `index.html` 中的资源版本号，避免缓存继续使用旧文件。
 
 > ⚠️ 用 paramiko 的 `sftp.put` 上传时，**注意把 Windows 路径的 `\` 换成 `/`**，
 > 否则文件会以 `snut\auth.py` 这种名字落在根目录，而不是进子目录。
@@ -238,7 +237,7 @@ systemctl restart course-web   # 改完重启一下，让网站拿到新值
 ]
 ```
 
-数组下标对应节次（0 = 第 1 节），共 11 项。改完刷新页面即可，**不用重启服务**。
+数组下标对应节次（0 = 第 1 节），共 11 项。修改后需重新生成课表快照，再刷新页面；**不用重启服务**。
 
 > 没有这个文件时，网站的课程详情里**不显示时间**——而不是填一个编的时间。
 > 同学照着错时间去了教室才是真的耽误事。

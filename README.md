@@ -1,276 +1,220 @@
-# 陕理工课表小助手
+<img src="web/logo.svg" width="64" height="64" alt="课格标志">
 
-[![Checks](https://github.com/genhaoer66/snut-course-notifier/actions/workflows/ci.yml/badge.svg)](https://github.com/genhaoer66/snut-course-notifier/actions/workflows/ci.yml)
+# 课格
 
-> 陕西理工大学（金智统一身份认证 + 树维 EAMS）的**课表自动推送 + 课表网站**。
-> 每天定时登录教务系统抓一次课表 → 把当天的课发到手机 → 同时生成一份脱敏快照，
-> 供一个只读网页展示。
+课格是面向陕西理工大学的课表自动推送与只读课表网站，以松石绿为主色，一次抓取生成邮件内容和网站使用的脱敏 JSON 快照。
 
-### 🤖 不想手动配置？把这句话丢给 AI 助手就行
+## 效果截图
 
-> [!TIP]
-> **把 [AGENT_SETUP.md](AGENT_SETUP.md) 里的提示词整段复制给你的 AI 助手**
-> （Claude Code / Cursor / ChatGPT / DeepSeek…），它会问你要几个必要的信息，
-> 然后**自动克隆仓库、装依赖、验证登录、抓一次课表，并起网站给你预览**。
->
-> 全程不需要你懂命令行，只要准备好三样东西：**学号**、**教务系统密码**、
-> **本学期第 1 周的周一日期**。
+截图均使用合成数据，不含真实个人信息。
 
-![今日课表](docs/images/screenshot-today.png)
+| 手机今日 · 浅色 | 手机今日 · 深色 | 手机周课表 |
+|---|---|---|
+| ![手机今日浅色](docs/images/today-mobile-light.png) | ![手机今日深色](docs/images/today-mobile-dark.png) | ![手机周课表](docs/images/week-mobile-light.png) |
 
-<sub>截图使用虚构的演示数据（教师 A/B/C…、示例教室），不含任何真实个人信息。</sub>
+![桌面双栏课表](docs/images/week-desktop-light.png)
 
-> 💬 **关于这个项目**：这是我的**第一个开源项目**，开发过程中大量借助 AI 辅助（也就是大家说的 **vibe coding**）——
-> 能跑、能用，但代码风格未必成熟，边界情况也未必都考虑到了。
-> 如果在使用中遇到异常、或觉得某处写得不合理，欢迎到 [Issues](https://github.com/genhaoer66/snut-course-notifier/issues) 反馈，也欢迎 PR。
-> 我会尽量跟进，请多包涵 🙏
-
----
-
-## 目录
-
-- [它解决什么问题](#它解决什么问题)
-- [特性](#特性)
-- [架构](#架构)
-- [快速开始](#快速开始)（🤖 [交给 AI 助手配置](AGENT_SETUP.md)）
-- [配置项](#配置项)
-- [命令](#命令)
-- [这个学校系统的坑](#这个学校系统的坑)
-- [部署](#部署)
-- [适配其他学校](#适配其他学校)
-- [安全边界](#安全边界)
-- [免责声明](#免责声明)
-- [License](#license)
-
----
-
-## 它解决什么问题
-
-陕西理工大学的教务系统响应慢（单次请求 17–20 秒）、有防刷机制（请求过密返回
-「请不要过快点击」）、手机上不好用。本项目把「查课表」变成两条**被动接收**的渠道：
-
-- 每天早上一条邮件到手机（可选再推一份到微信）；
-- 随时打开网页看今日课表与整周课表（手机端优先）。
+界面规格见 [设计文档](docs/DESIGN.md)，实际实现以 `web/` 为准。
 
 ## 特性
 
-| | |
-|---|---|
-| **一次抓取，多个产物** | 同一个进程既发推送、又写网站数据，不需要跑两次登录 |
-| **三层会话策略** | 复用 Cookie → 静默 SSO（CAS 票据）→ 完整登录，日常运行基本不触发风控与验证码 |
-| **全局限速** | 所有请求经 `ThrottledAdapter` 强制保持最小间隔，避免被判定为刷接口 |
-| **脱敏快照** | 白名单导出字段，学号、内部学生 ID、课程编码**绝不会**出现在快照里 |
-| **只读网站** | 网站进程不 import 任何碰学校系统的模块，内存里没有学号/密码/Cookie |
-| **可选访问口令** | 无状态 HMAC token（重启甚至换机都不失效）+ 同 IP 失败限速 |
-| **纯静态前端** | 零外链、零构建步骤，液态玻璃界面，手机端优先 |
-| **失败不静默** | 登录/抓取失败会发告警邮件，避免「几周后才发现早就不推了」 |
-| **可选验证码 OCR** | 装了 `ddddocr` 自动识别，没装就降级为人工登录脚本 |
+- 一次抓取，生成邮件与脱敏快照；可选 Server酱微信推送。
+- 会话按 Cookie 复用、静默 SSO、完整登录的顺序恢复，减少重复认证；支持可选验证码 OCR 和人工兜底。
+- HTTP 适配器限速与重试，适配响应慢、有防刷限制的学校系统。
+- 网站只读快照，访问和翻周不触发教务请求；支持共享访问口令与失败限速。
+- 纯 HTML、CSS、JavaScript，无前端构建步骤、外链脚本或远程字体。
+- 手机今日与周视图、桌面双栏、跟随系统深色模式、课程详情、键盘操作与打印样式。
+- 快照原子写入；抓取失败保留旧快照，网页显示更新时间，正常推送模式会尝试发送失败告警。
 
 ## 架构
 
-设计目标只有一条：**一次抓取，多个产物**。
-
 ```text
-定时任务（例如每天 7:00）
-  │
-  ├── 登录 authserver.snut.edu.cn      （金智统一身份认证 / CAS）
-  ├── 抓取 jwgl.snut.edu.cn/eams       （树维 EAMS，接口返回 JavaScript 而非 JSON）
-  ├── 解析课表 → CourseTable
-  │
-  ├──> 邮件 / Server酱                 （推送侧：只服务于自己）
-  └──> data/timetable.json             （脱敏快照）
-              │
-              ▼
-      uvicorn 127.0.0.1:8000 ──> Cloudflare Tunnel ──> 浏览器
+定时任务 / CLI
+  └─ 金智 CAS 登录 → 树维 EAMS 抓取 → CourseTable
+                                      ├─ formatter → 邮件（可选 Server酱）
+                                      └─ snapshot → data/timetable.json
+                                                        │ 只读
+                                                 FastAPI 网站
+                                                        │
+                                                  浏览器本地渲染
 ```
 
-### 两条铁律
-
-**① `snut/webapp.py` 不 import `auth` / `course` / `captcha`。**
-网站只读 `data/timetable.json`。一旦破了这个边界，网站就从「静态文件服务器」
-变成了「代理风控的入口」——同学每刷一次页面都会给学校增加一次请求。
-
-**② `snut/snapshot.py` 只导出白名单字段。**
-绝不用 `__dict__` / `vars()` 整包抛出。整包抛出的问题是：以后给 `Activity`
-加个字段，会**静默**出现在公网上；白名单则相反——新字段默认不公开。
+`snut/webapp.py` 不得 import `auth` / `course` / `captcha`，网站访问不得触发学校请求。
+快照通过字段白名单排除学号、内部学生 ID 与课程编码；仍包含课程、教师和教室信息，不能理解为完全匿名数据。
+当前 Web 共用 `Config`，会加载学校账号配置，因此不能宣称网站进程不持有凭证。详见 [架构说明](docs/ARCHITECTURE.md)。
 
 ## 快速开始
 
-需要 Python 3.8 或更高版本（本地 3.8.6 与服务器 3.13 均已实测）。
+代码兼容 Python 3.8 语法；依赖安装以所用 Python 版本与依赖包支持范围为准。前端自测另需 Node.js，CI 使用 Node.js 20。
 
 ```bash
 git clone https://github.com/genhaoer66/snut-course-notifier.git
 cd snut-course-notifier
-
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux / macOS
-source .venv/bin/activate
+```
 
+激活虚拟环境：Windows PowerShell 执行 `.venv\Scripts\Activate.ps1`；Linux / macOS 执行 `source .venv/bin/activate`。
+
+```bash
 python -m pip install -r requirements.txt
-# 可选：自动识别登录验证码（会额外安装较大的 OCR / ONNX 依赖）
+# 可选：验证码 OCR
 python -m pip install -r requirements-optional.txt
-
-cp .env.example .env        # Windows 用 copy
-# 然后编辑 .env，至少填学号、密码、本学期第一周周一
 ```
 
-先确认登录环节通了：
+复制 [配置模板](.env.example) 为 `.env`（PowerShell：`Copy-Item .env.example .env`；Linux / macOS：`cp .env.example .env`）。
+填写自己的 `SNUT_USERNAME`、`SNUT_PASSWORD`，并按学校校历填写 `SEMESTER_START`。模板日期不是每学期都适用。
+需要邮件时再填写 `SMTP_USER`、`SMTP_AUTH_CODE`、`MAIL_TO`；其中授权码不是邮箱登录密码。
 
 ```bash
-python scripts/test_login.py     # 诊断登录：成功 / 密码错误 / 需要验证码
-python -m snut.main --dry-run    # 抓一次课表并打印，不发推送、但会更新网站快照
-```
-
-起网站看效果：
-
-```bash
+python -m snut.main --dry-run
 python -m uvicorn snut.webapp:app --host 127.0.0.1 --port 8000
-# 浏览器打开 http://127.0.0.1:8000
 ```
 
-不想装 Python 也能看界面（`demo/index.html` 是纯静态的 UI 预览）：
-
-```bash
-python -m http.server 8765 --directory demo
-```
+打开 <http://127.0.0.1:8000>。`--dry-run` 仍会登录学校、抓取课表、保存会话与更新快照，只是不发推送；它不是离线模式。
+首次未生成快照时，网站提示暂无数据。需要助手引导配置时可参阅 [AGENT_SETUP.md](AGENT_SETUP.md)。
 
 ## 配置项
 
-全部配置集中在项目根目录的 `.env`（已被 `.gitignore` 忽略，不会进版本库）。
-完整说明见 [`.env.example`](.env.example)。
+以下逐项对应 [`.env.example`](.env.example) 与 [`snut/config.py`](snut/config.py)。环境变量优先，字符串会去除首尾空白；空字符串按缺省值处理。
 
-| 变量 | 必填 | 说明 |
+| 变量 | 代码缺省值 / 要求 | 说明 |
 |---|---|---|
-| `SNUT_USERNAME` | ✅ | 学号 |
-| `SNUT_PASSWORD` | ✅ | 教务系统密码（代码内按学校要求 AES 加密后再提交） |
-| `SEMESTER_START` | 建议 | 本学期**第 1 周周一**，`YYYY-MM-DD`。不填则不按周次过滤 |
-| `SMTP_USER` / `SMTP_AUTH_CODE` / `MAIL_TO` | 发邮件时 | 注意 `SMTP_AUTH_CODE` 是**邮箱授权码**，不是登录密码 |
-| `SERVERCHAN_KEY` | 可选 | Server酱 SendKey，填了才推微信 |
-| `WEB_PASSWORD` | 可选 | 网站访问口令。留空＝完全公开 |
-| `EAMS_BASE` / `AUTH_BASE` | 一般不用改 | 教务系统与统一认证地址 |
-| `HTTP_TIMEOUT` | 建议 60 | 学校服务器很慢，别设太小 |
-| `REQUEST_INTERVAL` | 建议 ≥2 | 两次请求之间的最小间隔（秒），防刷 |
-| `DEBUG_SAVE_RAW` | 调试 | 设为 `1` 会把抓到的原始响应存到 `logs/` |
+| `SNUT_USERNAME` | 必填 | 自己的学校账号；示例使用 `2024XXXXXXXX` |
+| `SNUT_PASSWORD` | 必填 | 教务登录密码，仅在本地配置 |
+| `AUTH_BASE` | `https://authserver.snut.edu.cn/authserver` | 金智 CAS 地址 |
+| `EAMS_BASE` | `http://jwgl.snut.edu.cn/eams` | 树维 EAMS 地址 |
+| `SMTP_HOST` | `smtp.qq.com` | SMTP 主机 |
+| `SMTP_PORT` | `465` | 整数端口；发送端使用 SMTP_SSL |
+| `SMTP_USER` | 空 | SMTP 登录账号，需自行填写 |
+| `SMTP_AUTH_CODE` | 空 | SMTP 授权码 |
+| `MAIL_TO` | 空 | 收件地址，需自行填写 |
+| `MAIL_FROM_NAME` | `课表小助手` | 邮件发件人显示名 |
+| `SERVERCHAN_KEY` | 空 | 填入 SendKey 才启用 Server酱 |
+| `WEB_PASSWORD` | 空 | 空表示课表公开；填写后启用共享访问口令 |
+| `HTTP_TIMEOUT` | `30` | 请求超时秒数；模板为 `60`，慢速教务系统建议沿用模板 |
+| `REQUEST_INTERVAL` | `2.0` | 请求最小间隔秒数；模板为 `3`，建议不低于 2 |
+| `DEBUG_SAVE_RAW` | `False` | 模板为 `0`；`1/true/yes/on`（不区分大小写）启用原始响应调试保存 |
+| `SEMESTER_START` | 空 | 第 1 周周一，格式 `YYYY-MM-DD`；空则无法按教学周准确过滤，模板日期需按校历更新 |
 
-## 命令
+邮件仅在 `SMTP_USER`、`SMTP_AUTH_CODE`、`MAIL_TO` 三项齐全时启用。
+`logs/`、`.session/`、`data/`、`web/` 路径由代码相对项目根目录确定，不是环境配置项。
+
+补充：`snut/webapp.py` 单独读取可选的 `SNUT_OG_BASE`，用于分享卡片站点根地址，例如 `https://example.edu.cn`，它不在上述模板与 `Config` 中。
+节次时间来自可选 `data/periods.json`，缺少时只显示节次；更新该文件后需重新生成快照才能反映到网站。
+
+## 常用命令
 
 ```bash
-python -m snut.main                      # 推送今天的课表
-python -m snut.main --for tomorrow       # 推送明天的课表
-python -m snut.main --dry-run            # 只抓取和打印，不发推送（仍会更新网站快照）
-python -m snut.main --week 9             # 手动指定教学周次
-python -m snut.main --no-snapshot        # 不更新网站快照
+python -m snut.main                       # 推送今天
+python -m snut.main --for tomorrow        # 推送明天
+python -m snut.main --dry-run             # 不推送，仍更新快照
+python -m snut.main --dry-run --week 9    # 指定教学周次
+python -m snut.main --dry-run --no-snapshot # 不推送、不更新快照，仍请求学校
 python -m snut.main --help
-
-python -m unittest discover -s tests -v  # 单元测试
-python -m compileall -q snut scripts     # 语法检查
-node --check web/app.js                  # 前端语法检查
 ```
 
-诊断工具（不参与日常运行）：
+诊断工具会访问学校系统，请按需使用并保留限速，不要密集重试：
 
 ```bash
-python scripts/test_login.py             # 登录诊断
-python scripts/debug_course.py           # 课表结构诊断，把原始响应存到 logs/
-python scripts/captcha_login.py fetch    # 验证码人工兜底：先抓图
+python scripts/test_login.py
+python scripts/debug_course.py
+python scripts/captcha_login.py fetch
 python scripts/captcha_login.py submit <验证码>
 ```
 
-## 这个学校系统的坑
+## 项目结构
 
-> 这段是本项目最值钱的部分——全部是实测踩出来的。
-> **陕理工不是正方教务系统**，网上 99% 的「Python 爬课表」教程（`/jwglxt/`、
-> `xskbcx.aspx`）在这里一行都用不上。
+```text
+snut/
+  auth.py             登录门面、密码加密与会话恢复编排
+  auth_http.py        HTTP 会话、限速、重试与协议纠正
+  login_page.py       登录页纯解析与结果判断
+  session_store.py    Cookie 持久化与兼容恢复
+  course.py           EAMS 请求、课表解析与 CourseTable / Activity
+  captcha.py          可选验证码 OCR
+  config.py           环境配置、校验与运行目录
+  formatter.py        文本 / HTML 格式化与教学周计算
+  notify.py           邮件、Server酱和失败告警
+  snapshot.py         快照白名单、原子写入与读取
+  main.py             CLI 流程编排
+  web_security.py     HMAC 令牌、失败限速与请求身份解析
+  webapp.py           快照 API、静态资源与 HTTP 响应
+web/                  无构建的前端及品牌资源
+scripts/              登录诊断、抓取诊断和部署工具
+deploy/               systemd 服务单元
+tests/                unittest、合成 fixtures 与 js/ui-selftest.js
+docs/                 架构、设计规格与合成截图
+.github/              CI 与问题模板
+```
 
-| # | 坑 | 正确做法 |
-|---|---|---|
-| 1 | 登录页有 **4 套表单**（生物识别/短信/账号密码/扫码），`id` 重复，第一个 `id="cllt"` 属于生物识别表单 | 硬编码 `cllt=userNameLogin`、`dllt=generalLogin`，不要去解析 |
-| 2 | `startWeek=1` 只返回第 1 周的课（实测 28 门缩成 1 门） | `startWeek` 必须传**空串**；另外不能传 `project.id`，传了 500 |
-| 3 | `ids` 不是学号 | 它是学校数据库里的学生记录内部 ID，要从课表页 JS 里现场提取 |
-| 4 | 周次位图 `"0111000..."` 的下标 | **第 i 位就是第 i 周**，第 0 位只是占位符。写成 `i+1` 会让所有课程整体偏移一周 |
-| 5 | 落格索引 | `index = 星期 * unitCount + 节次`，星期与节次**都从 0 开始** |
-| 6 | CAS 会把 302 指向 `http://authserver...`（80 端口不通） | 照此重定向会一直卡到超时（`WinError 10060`），必须在 adapter 里强制升级为 https |
-| 7 | 有防刷机制 | 请求过密会返回「请不要过快点击」而不是数据，必须全局限速 |
-| 8 | 教务系统**没有**学期起始日期接口（`schoolCalendar!search.action` 返回 404） | `SEMESTER_START` 只能手工维护，**且不能用「哪几周空着」反推** |
-| 9 | 空白周 ≠ 假期 | 可能是**实训周**（集中实践环节，全校不上常规课）。要拿学校的调课通知来验证，校方口径 > 任何推算 |
-| 10 | 登录失败若干次后会要求**图形验证码** | 会话复用能大幅降低触发概率；真遇到可用 OCR 或人工兜底脚本 |
+运行时产生的配置、会话、快照和日志均不属于仓库产物。
 
-第 4、8、9 条尤其危险：**算错一周，邮件和网站都会显示「看起来很正常」的错课**，极难发现。
-详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+## 测试
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m unittest discover -s tests
+python -m compileall -q snut scripts tests
+node --check web/app.js
+node tests/js/ui-selftest.js
+```
+
+Python 测试使用模拟请求和临时数据，覆盖认证、解析、配置、快照、推送及 Web 路由。
+前端自测无需浏览器，覆盖周次、过滤排序、跨周下一次课程、跨零点、颜色哈希、资源约定与错误分类。
+CI 分别运行 Python 与前端检查。
 
 ## 部署
 
-抓取任务建议用 cron / systemd timer，每天执行一次；网站服务只监听 `127.0.0.1`，
-公网入口交给 Cloudflare Tunnel（这样源站不开放任何入站端口）。
+- [DEPLOY.md](DEPLOY.md)：定时抓取与邮件运维。
+- [DEPLOY-WEB.md](DEPLOY-WEB.md)：网站服务、静态资源、隧道与排查。
 
-- [DEPLOY.md](DEPLOY.md)：抓取任务与服务器基础部署
-- [DEPLOY-WEB.md](DEPLOY-WEB.md)：网站服务、Cloudflare Tunnel 与运维
+定时任务和网站服务独立运行。部署前端时上传 `web/` 全部文件，并更新 CSS/JS 引用版本号；只更新前端无需重新抓课表。
+定时抓取频率按个人需要设置，避免反复登录；定时任务可错开整点。
 
-> ⚠️ 定时任务**建议避开整点**（学校服务器在整点前后负载高，也更容易被风控注意到）。
-> 例如要「早上 7 点」，可以用 `3 7 * * *`（7:03）。
+## 这个学校系统的坑
+
+陕西理工大学使用金智 CAS 统一认证与树维 EAMS，课表接口返回 JavaScript，不能套用正方系统的 JSON 接口教程。
+
+| 问题 | 当前处理 |
+|---|---|
+| 登录页多套表单的 ID 重复 | `login_page.py` 固定 `cllt=userNameLogin`、`dllt=generalLogin`，密码按 AES-CBC/PKCS7 加密 |
+| `startWeek=1` 只取第 1 周 | 传空串取整学期，且不传会导致失败的 `project.id` |
+| `ids` 不是学号 | 从课表页 JS 提取学生记录内部 ID |
+| 周次位图整体偏移风险 | 下标 i 就是第 i 周，第 0 位仅占位，不能再加 1 |
+| 节次索引偏移风险 | `index = 星期 * unitCount + 节次`，星期与节次都从 0 开始 |
+| CAS 重定向到不可达的 80 端口 | `auth_http.py` 将学校认证主机的 HTTP 请求提升为 HTTPS |
+
+学校防刷提示可能以 HTML 返回；请求要限速。Cookie 保存必须保留 domain/path，才能复用 CAS 票据。
+`SEMESTER_START` 需依据学校校历或调课通知手工维护；空白周可能是实训周，不能据此反推假期或开学日。
+这些学校行为来自既有实测记录，后续接口变化仍需重新验证。
 
 ## 适配其他学校
 
-**目前本项目只适用于陕西理工大学**：`snut/auth.py`（金智 CAS）与
-`snut/course.py`（树维 EAMS 的 JavaScript 课表解析）都是照着这所学校的系统写的。
+当前只实现陕西理工大学。学校相关逻辑主要在 `auth.py`、`auth_http.py`、`login_page.py` 与 `course.py`；
+不能仅改域名就假设兼容其他学校。先核实认证表单、加密方式、会话策略、学期接口及课表响应格式。
 
-好消息是学校相关的部分被收敛在了两个模块里，其余模块**完全不关心学校细节**：
-
-```text
-snut/config.py      读配置
-snut/auth.py        ← 学校相关：登录
-snut/course.py      ← 学校相关：抓取 + 解析，产出 CourseTable
-snut/formatter.py     只认 CourseTable
-snut/notify.py        只认文本 / HTML
-snut/snapshot.py      只认 CourseTable
-snut/webapp.py        只认快照 JSON
-web/                  只认 /api/timetable 的字段
-```
-
-所以移植的边界很清楚：**只要新的 provider 能产出 `CourseTable`（一组 `Activity`），
-推送和网站一行都不用改**。真要做多校支持，合理的重构方向是：
-
-1. 定义 `AuthProvider.ensure_login()` 与 `CourseProvider.load_table()` 两个接口；
-2. 把 `auth.py` / `course.py` 变成 `providers/snut/` 下的实现；
-3. `config.py` 增加 `SCHOOL=snut` 之类的选择项，按学校注入不同 provider；
-4. 其余模块保持不动——它们的输入始终是 `CourseTable` 与快照 JSON。
-
-欢迎 issue / PR 补充其它学校的实现（特别欢迎「登录页表单结构」「课表接口返回格式」
-这类实测记录，比代码本身更难获取）。
+移植时以 `CourseTable` / `Activity` 为数据边界：保持字段和周次、星期、节次语义，格式化与快照模块即可复用；网站只依赖快照 JSON。
+如需多校支持，可定义 `AuthProvider.ensure_login()`、`CourseProvider.load_table()`，再按学校注入实现。
+这是后续扩展建议，当前没有 `SCHOOL` 配置或 provider 插件体系。
+欢迎提供脱敏后的接口结构与复现记录，不要提交真实响应和凭证。
 
 ## 安全边界
 
-| 风险 | 措施 |
-|---|---|
-| 学号 / 内部 ID 泄漏 | 快照白名单导出，从源头排除 |
-| 账号密码泄漏 | 只存服务器本地 `.env`（权限 `600`），已 `.gitignore` |
-| 会话泄漏 | `.session/cookies.json` 等同于登录凭证，已 `.gitignore`，不要外传 |
-| 网站被陌生人查看 | `WEB_PASSWORD` 共享口令（留空则完全公开） |
-| 口令被暴力破解 | 同 IP 连续错 8 次锁 5 分钟 |
-| 被搜索引擎 / AI 爬虫收录 | `X-Robots-Tag: noindex` + HTML meta + robots.txt 点名挡 AI 爬虫 |
-| 源站 IP 暴露 | Cloudflare Tunnel 出站连接，服务只监听 `127.0.0.1` |
-| 学校系统被压垮 | 全局限速 + 网站完全不碰学校系统 |
-
-提交代码前请自查：
-
-```bash
-git status --short
-git diff -- . ':!*.lock'
-```
-
-下面这些必须保持**未跟踪**：`.env`、`.session/`、`data/`、`logs/`，
-以及任何 SSH 密码、Tunnel token、邮箱授权码。密钥一旦误提交过，
-不能只删当前文件——必须立即作废并重新生成。
+- `.env`、`.session/`、`data/`、`logs/` 保持未跟踪；Cookie 等同登录凭证。限制本地配置权限，勿粘贴到问题或提交中。
+- 快照只导出 `name/teachers/room/day/units/weeks` 等必要内容，新增对象字段不会自动公开；教师与教学安排仍需由部署者判断访问范围。
+- Web 不导入学校请求模块，但当前共用账号配置，尚不构成凭证隔离。不要将网站进程安全等同于学校账号安全。
+- `WEB_PASSWORD` 是共享口令，不是多用户账户系统；空值表示公开。HMAC 令牌有效期为 30 天，修改口令会使旧令牌失效。
+- 同 IP 在 300 秒窗口内累计 8 次失败后限流；失败计数在进程内存中。反向代理来源头仅应在可信入口下使用。
+- 网站服务绑定回环地址，公网入口提供 HTTPS；`noindex` 与 robots.txt 是爬虫约定，不能替代访问控制。
+- 学校请求存在 SSL 校验失败后关闭验证重试的现有兼容行为；不要把它理解为端到端强证书校验。
+- 凭证若曾进入版本历史，应立即撤销或更换，删除当前文件不足以消除泄漏。
 
 ## 免责声明
 
-- 本项目仅用于**查询自己的课表**，请遵守所在学校的网络与信息系统使用规定。
-- 请勿用于批量抓取、代刷、或获取他人数据；请保留限速配置，不要给学校服务器增加压力。
-- 教务系统接口随时可能改版，本项目不保证长期可用；因使用本项目产生的任何后果由使用者自行承担。
-- 仓库内**不包含**任何学校的账号、密码、Cookie 或真实教师/同学的个人信息；
-  示例与截图均为虚构数据。
+本项目用于查询自己的课表，请遵守学校网络与信息系统使用规定。
+不得用于批量抓取、代刷或获取他人数据；保留限速，避免给学校系统增加压力。
+教务接口可能随时变化，项目不保证持续可用，使用者需自行核对重要教学安排并承担使用后果。
+公开示例与截图应仅使用虚构数据，不提交账号、密码、Cookie 或个人信息。
 
 ## License
 
@@ -278,8 +222,7 @@ git diff -- . ':!*.lock'
 
 ## 参考
 
-- [`Ares-Gao/WeCourseService`](https://github.com/Ares-Gao/WeCourseService) —— 树维 EAMS 的 SDK，其配置示例包含陕理工
-- [`Anya1014CN/SmartSNUTServer`](https://github.com/Anya1014CN/SmartSNUTServer) —— 同校学长写的 APP 服务端
+- [Ares-Gao/WeCourseService](https://github.com/Ares-Gao/WeCourseService)：树维 EAMS SDK，含陕理工配置示例。
+- [Anya1014CN/SmartSNUTServer](https://github.com/Anya1014CN/SmartSNUTServer)：同校 APP 服务端参考实现。
 
-⚠️ 参考不等于照抄：以上两个项目都是「每次请求重新登录」、没有会话复用与失效降级，
-本项目在实测基础上做了改进。**外部资料请一律先实测再采纳。**
+外部实现与资料只作参考，具体接口和行为应在授权范围内实测后采纳。
