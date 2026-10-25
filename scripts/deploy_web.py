@@ -30,17 +30,21 @@ REMOTE = os.environ.get("SNUT_REMOTE_DIR", "/opt/course-notifier")
 # ⚠️ 远程路径一律用 / 分隔。用 Windows 的 \ 会让文件以
 #    "snut\config.py" 这种名字落在项目根目录，而不是进 snut/ 子目录——
 #    而且不会报错，只会静默错位。
-FILES = [
-    "snut/config.py",
-    "snut/main.py",
-    "snut/snapshot.py",
-    "snut/webapp.py",
-    "web/index.html",
-    "web/app.js",
-    "web/style.css",
-    "deploy/course-web.service",
-    "DEPLOY-WEB.md",
-]
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _collect_files():
+    """snut/ 下全部 .py、web/ 下全部文件，再加部署单元与文档，避免新增模块漏传。"""
+    files = []
+    for folder, pattern in (("snut", ".py"), ("web", None)):
+        for name in sorted(os.listdir(os.path.join(_ROOT, folder))):
+            path = os.path.join(_ROOT, folder, name)
+            if os.path.isfile(path) and (pattern is None or name.endswith(pattern)):
+                files.append("%s/%s" % (folder, name))
+    return files + ["deploy/course-web.service", "DEPLOY-WEB.md"]
+
+
+FILES = _collect_files()
 
 
 def connect(password):
@@ -96,6 +100,10 @@ def main():
     client = connect(password)
     try:
         sftp = client.open_sftp()
+
+        backup = ".backup-web-" + time.strftime("%Y%m%d-%H%M%S")
+        run(client, "cd %s && mkdir -p %s && cp -a snut web %s/" % (REMOTE, backup, backup),
+            label="备份当前 snut/ 与 web/ 到 %s/%s（回滚用）" % (REMOTE, backup))
 
         # 先把远程目录建出来，否则 put 会失败
         dirs = sorted({os.path.dirname(f).replace("\\", "/") for f in FILES})
