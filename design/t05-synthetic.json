@@ -1,0 +1,102 @@
+{
+  "updated_at": "2026-10-22 07:00",
+  "updated_ts": 1792623600,
+  "semester_start": "2026-08-31",
+  "current_week": 8,
+  "server_today": "2026-10-22",
+  "unit_count": 11,
+  "periods": null,
+  "courses": [
+    {
+      "name": "汽车构造",
+      "teachers": "示例教师甲",
+      "room": "7号楼 7203",
+      "day": 3,
+      "units": [
+        0,
+        1
+      ],
+      "weeks": [
+        8,
+        9,
+        10,
+        17
+      ]
+    },
+    {
+      "name": "机械设计基础",
+      "teachers": "示例教师乙",
+      "room": "7号楼 7105",
+      "day": 3,
+      "units": [
+        2,
+        3
+      ],
+      "weeks": [
+        8,
+        9,
+        10,
+        17
+      ]
+    },
+    {
+      "name": "工程力学",
+      "teachers": "示例教师丙",
+      "room": "8号楼 8201",
+      "day": 0,
+      "units": [
+        0,
+        1
+      ],
+      "weeks": [
+        9,
+        17
+      ]
+    },
+    {
+      "name": "高等数学",
+      "teachers": "示例教师丁",
+      "room": "A101",
+      "day": 1,
+      "units": [
+        4,
+        5
+      ],
+      "weeks": [
+        8,
+        9,
+        17
+      ]
+    },
+    {
+      "name": "大学英语",
+      "teachers": "示例教师戊",
+      "room": "B202",
+      "day": 2,
+      "units": [
+        6,
+        7
+      ],
+      "weeks": [
+        8,
+        9,
+        17
+      ]
+    },
+    {
+      "name": "材料成型",
+      "teachers": "",
+      "room": "",
+      "day": 4,
+      "units": [
+        8,
+        9
+      ],
+      "weeks": [
+        8,
+        9,
+        17
+      ]
+    }
+  ]
+}

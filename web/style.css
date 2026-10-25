@@ -1,1295 +1,204 @@
-/* 课表网站样式 —— 第四版
- *
- * 这一版的目标是「安静但经得起看」：把第三版堆在每张卡片上的玻璃、
- * 阴影、渐变收掉大半，只保留一处材质（共享玻璃面板）+ 一处彩色（课程色条），
- * 让信息层级自己说话。改动集中在四件事：
- *
- *   ① 配色从 HSL 搬到 OKLCH。第三版课程色用 `hsl(h 50% 45%)` 生成——HSL 的
- *      亮度不是感知亮度，黄色系会明显比蓝色系亮一档，11 门课的色条轻重不一。
- *      OKLCH 的 L 是感知亮度，锁死 L 和 C 只放 hue，全表重量立刻就平了。
- *   ② 修好对比度。第三版的 --steel(#536ba9) 在白玻璃上只有 4.4:1，
- *      --mist(#9fb0d9) 只有 2.4:1（远低于 WCAG AA 的 4.5:1），而后者正是
- *      12px 表头日期和页脚在用的颜色。这一版把文字色统一提到 5:1 以上。
- *   ③ 补上深色模式。教室里的手机、晚上的宿舍，浅色玻璃翻白是常态；
- *      深色模式用 prefers-color-scheme 自动切换，不需要开关。
- *   ④ 去掉营销化的首屏。原来的「今天有 N 门课，安排得刚刚好。」占了
- *      最大的字号却没有信息量，换成「今天上什么课」的下一节课提示。
- *
- * 硬约束（来自 CLAUDE.md）：不引入任何外部字体 / 图标 / CDN，
- * 保证大陆网络下首屏零外部依赖。
- */
-
-/* ==================================================================
-   设计令牌
-   ================================================================== */
-
 :root {
-  color-scheme: light dark;
-
-  /* --- 文字与强调色 ---
-     --ink 是主文字，--muted 用于次要信息。两者的 oklch L 是照着
-     WCAG AA 反推的：主文字 ≥ 9:1，次要文字 ≥ 5:1（14px 正文也要达标）。 */
-  --ink:        oklch(28% 0.115 268);
-  --ink-strong: oklch(22% 0.120 268);
-  --muted:      oklch(45% 0.105 264);   /* 6.7:1 */
-  /* --faint 是 11.5–12px 的小字（表头日期、页脚、柱图刻度）。第三版这里是
-     #9fb0d9，实测只有 2.4:1，在教室里根本看不清。这一版压到 50% L，
-     实测 5.3:1，同时保持「比 --muted 更弱」的视觉层级。 */
-  --faint:      oklch(50% 0.075 264);   /* 5.3:1 */
-  --accent:     oklch(52% 0.185 264);
-  --danger:     oklch(54% 0.190 25);
-
-  /* --- 表面与墨线 --- */
-  --ground:     #e9eefa;
-  --panel:      rgba(255, 255, 255, 0.52);
-  --panel-2:    rgba(255, 255, 255, 0.34);
-  --well:       rgba(255, 255, 255, 0.20);
-  /* 周课表冻结的节次列要盖住从底下滑过去的课程块，必须是实色。
-     留一丝透明度都不行：浅色下 2% 的透出看着还好，深色下同样的 2% 放在
-     近黑底上就是 16% 的相对提亮，课名会明晃晃地印在列上。
-     用近似底色的实色，而不是纯白，免得在玻璃上割出一条硬边。 */
-  --sticky-col: #e9eefa;
-  --hairline:   rgba(255, 255, 255, 0.55);
-  --hairline-2: rgba(32, 49, 112, 0.09);
-  --track:      rgba(32, 49, 112, 0.14);
-
-  /* --- 玻璃材质 ---
-     ④ 斜向镜面反光写在 background 第一层；反过来会盖住文字。 */
-  --glass-bg:
-    linear-gradient(128deg,
-      rgba(255, 255, 255, 0.30) 0%,
-      rgba(255, 255, 255, 0.06) 38%,
-      rgba(255, 255, 255, 0) 62%,
-      rgba(255, 255, 255, 0.12) 100%),
-    linear-gradient(165deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
-  --glass-blur: blur(30px) saturate(1.9);
-  --glass-edge:
-    0 26px 60px -26px rgba(24, 38, 92, 0.34),
-    0 1px 2px rgba(24, 38, 92, 0.06),
-    inset 0 1px 1px rgba(255, 255, 255, 0.85),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.30),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-
-  /* --- 圆角语法：按组件的角色分级，不再到处 22/26/30 乱飘 --- */
-  --r-xs: 9px;    /* 进度条、色条 */
-  --r-sm: 12px;   /* 小按钮、图标底 */
-  --r-md: 16px;   /* 列表卡片 */
-  --r-lg: 22px;   /* 面板 */
-  --r-xl: 28px;   /* 首屏 / 弹窗 */
-
-  /* --- 间距梯：4 的倍数 --- */
-  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
-  --s5: 20px; --s6: 24px; --s7: 32px; --s8: 44px;
-
-  /* --- 字体 ---
-     中文正文用系统里最好的那几款；诗句和数字标题用衬线，
-     西文走 Georgia / Times 这条线，不联网取字体。 */
-  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC",
-    "HarmonyOS Sans SC", "Source Han Sans SC", "Noto Sans CJK SC",
-    "Microsoft YaHei", sans-serif;
-  --font-serif: "Songti SC", "STSong", "Source Han Serif SC",
-    "Noto Serif CJK SC", "SimSun", Georgia, serif;
-  --font-kai: "Kaiti SC", "STKaiti", "KaiTi", "楷体", "Songti SC",
-    "SimSun", Georgia, serif;
-  --font-num: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI",
-    system-ui, sans-serif;
-
-  /* --- 周课表几何 --- */
-  --grid-row: 74px;
-  --unit-col: 40px;
-
-  /* 诗句排版时要从视口宽度里扣掉的横向留白（.shell + .poem 的内边距）。
-     放在这里而不是写死在 calc() 里，是为了让窄屏媒体查询能覆盖它。 */
-  --poem-gutter: 88px;
-
-  /* --- 动效：统一两条曲线，不用弹跳（弹跳会让「课表」显得不严肃） --- */
-  --ease-out: cubic-bezier(0.22, 0.72, 0.28, 1);
-  --ease-in-out: cubic-bezier(0.5, 0, 0.2, 1);
-  --t-fast: 150ms;
-  --t-base: 220ms;
+ --bg:#F5F6F4;--surface:#FFFFFF;--surface-2:#ECEEEA;--border:#D5DAD4;--text:#161A1A;--text-2:#475150;--text-3:#636D6B;--accent:#0D7268;--on-accent:#FFFFFF;--accent-soft:#DCF0EC;--today:#FFF6DB;--danger:#B42318;--warn:#8A5300;--focus:var(--accent);--scrim:rgba(22,26,26,.45);
+ --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC","Source Han Sans SC","Segoe UI",Roboto,sans-serif;
+ --font-num:"SF Pro Text","Segoe UI",Roboto,var(--font);
+ --fs-display:28px;--fs-h2:20px;--fs-h3:17px;--fs-body:15px;--fs-small:13px;--fs-cap:12px;--fs-micro:11px;
+ --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-8:32px;--sp-12:48px;
+ --r-sm:6px;--r-md:10px;--r-lg:16px;--r-pill:999px;--tap:44px;--bar-h:56px;--shadow-sheet:0 -8px 24px rgba(0,0,0,.12);--shadow-card:none;--row-h:48px;
+}
+@media (prefers-color-scheme:dark) { :root {
+ --bg:#0E1213;--surface:#171C1D;--surface-2:#202728;--border:#323B3C;--text:#E9EDEC;--text-2:#B4BEBC;--text-3:#8F9A98;--accent:#3FC8B7;--on-accent:#06231F;--accent-soft:#133430;--today:#2A2513;--danger:#FF8A80;--warn:#F2B84B;--scrim:rgba(0,0,0,.60);--shadow-sheet:none;
+} }
+* {box-sizing:border-box;letter-spacing:0}
+[hidden] {display:none!important}
+html {min-width:320px;background:var(--bg);color:var(--text);font-family:var(--font);font-variant-numeric:tabular-nums;color-scheme:light dark}
+body {margin:0;font-size:var(--fs-body);line-height:22px}
+h1,h2,h3,p,dl,dd {margin:0} h1,h2,h3 {font-weight:600}
+button,input {font:inherit;color:inherit} button {cursor:pointer;border:0;background:transparent;min-height:var(--tap);min-width:var(--tap);padding:0;border-radius:var(--r-md);transition:background-color 100ms linear,border-color 100ms linear;text-align:center}
+button:disabled {cursor:default;opacity:.38} button:active {background:var(--surface-2)}
+:focus-visible {outline:2px solid var(--focus);outline-offset:2px}
+.icon {width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;vertical-align:middle}
+.symbols {position:absolute;width:0;height:0;overflow:hidden}
+.container {width:100%;max-width:720px;margin:0 auto;padding-left:calc(16px + env(safe-area-\69 nset-left));padding-right:calc(16px + env(safe-area-\69 nset-right))}
+.sr-only {position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.topbar {height:calc(var(--bar-h) + env(safe-area-\69 nset-top));padding-top:env(safe-area-\69 nset-top);position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+.bar-inner {height:var(--bar-h);display:flex;align-items:center;justify-content:space-between}
+.brand {display:flex;align-items:center;gap:8px;font-size:var(--fs-h3);line-height:24px}
+.brand svg {width:24px;height:24px}
+#view-tabs {display:flex;padding:3px;background:var(--surface-2);border-radius:var(--r-pill);height:36px}
+#view-tabs button {position:relative;width:64px;min-height:30px;height:30px;font-size:var(--fs-small);line-height:18px;font-weight:500;color:var(--text-2);border-radius:var(--r-pill)}
+#view-tabs button::before {content:"";position:absolute;top:-7px;right:0;bottom:-7px;left:0}
+#view-tabs button[aria-selected="true"] {color:var(--text);background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+#view-tabs button:active {background:var(--border)}
+#bar-update {font-size:var(--fs-small);color:var(--text-3)}
+.layout {padding-top:20px;padding-bottom:24px}
+#pane-today,#pane-week {min-width:0;animation:panel-in 160ms cubic-bezier(.2,0,0,1)}
+.date-line {font-size:var(--fs-small);line-height:18px;color:var(--text-2)}
+#today-title {font-size:var(--fs-display);line-height:34px;margin-top:4px}
+#today-list {display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.course {position:relative;display:flex;gap:12px;align-items:flex-start;min-height:76px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 16px 12px 20px;box-shadow:var(--shadow-card)}
+.course::before {content:"";position:absolute;left:8px;top:12px;bottom:12px;width:4px;border-radius:2px;background:var(--c-bar)}
+.course-time {width:56px;flex-shrink:0;display:flex;flex-direction:column;font-family:var(--font-num)}
+.course-time strong {font-size:15px;font-weight:600;line-height:24px;white-space:nowrap}
+.course-time>span {font-size:var(--fs-cap);line-height:16px;color:var(--text-3);margin-top:2px}
+.course-body {display:flex;flex:1;min-width:0;flex-direction:column;gap:2px}
+.course-name {font-size:var(--fs-h3);line-height:24px;font-weight:600;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.course-room {font-size:var(--fs-body);line-height:22px;font-weight:500;color:var(--text-2);display:flex;align-items:flex-start;gap:4px}
+.course-room .icon {width:14px;height:14px;margin-top:4px}
+.course-room span {min-width:0;overflow-wrap:anywhere}
+.course-teacher {font-size:var(--fs-small);line-height:18px;color:var(--text-3)}
+.course:active {background:var(--surface-2)}
+.empty-card {padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md)}
+.empty-title {font-weight:600;font-size:15px;line-height:22px}
+.next-course {display:flex;flex-direction:column;width:100%;text-align:left;border-top:1px solid var(--border);margin-top:16px;padding-top:12px;line-height:22px;border-radius:0;overflow-wrap:anywhere}
+.next-label {font-size:var(--fs-cap);line-height:16px;color:var(--text-3);margin-bottom:4px}
+.notice {padding:20px;background:var(--surface-2);color:var(--text-2);border-radius:var(--r-md)}
+.poem {margin-top:24px;font-size:var(--fs-small);line-height:20px;color:var(--text-3)}
+.week-nav {display:flex;align-items:flex-start;justify-content:space-between;min-height:48px;margin-top:-8px;gap:4px}
+.arrow {width:44px;height:44px;flex-shrink:0;font-size:28px;line-height:44px;color:var(--text-2)}
+.week-center {display:flex;flex-direction:column;align-items:center;min-width:0}
+#week-label {border-radius:var(--r-pill);line-height:24px;padding:0 4px}
+.week-number {font:600 17px/24px var(--font-num)}
+.week-range {font-size:var(--fs-small);line-height:18px;color:var(--text-3);white-space:nowrap}
+.week-badge {display:inline-block;font-size:var(--fs-cap);line-height:16px;font-weight:500;background:var(--accent-soft);color:var(--accent);border-radius:var(--r-pill);padding:2px 8px;margin-left:4px}
+#week-reset {position:relative;min-height:32px;font-size:var(--fs-small);color:var(--accent)}
+#week-reset::before {content:"";position:absolute;top:-6px;right:0;bottom:-6px;left:0}
+.week-summary {margin:8px 0 12px;font-size:var(--fs-small);line-height:18px;color:var(--text-2)}
+.grid-scroll {overflow-x:auto;background:var(--surface);border-radius:var(--r-md)}
+#grid {width:100%;table-layout:fixed;border-collapse:separate;border-spacing:2px;background:var(--surface)}
+.unit-col {width:24px}
+#grid th {font-weight:500;font-size:var(--fs-cap);line-height:16px;color:var(--text-2);padding:0;text-align:center}
+#grid thead th {height:44px;padding:4px 0}
+#grid th span {display:block}
+#grid .grid-date,#grid .grid-load {font-size:var(--fs-micro);line-height:14px;color:var(--text-3);font-weight:400}
+#grid tbody th {font-family:var(--font-num);color:var(--text-3);font-weight:400}
+#grid tbody tr {height:var(--row-h)}
+#grid td {padding:0;height:var(--row-h);vertical-align:top}
+#grid .is-today {background:var(--accent-soft)}
+#grid thead .is-today,#grid thead .is-today span {color:var(--accent)}
+#grid .unit-divider td:empty {border-bottom:1px solid var(--border)}
+.grid-course {display:flex;flex-direction:column;justify-content:center;gap:4px;align-items:stretch;width:100%;min-width:0;min-height:44px;text-align:left;padding:4px;background:var(--c-bg);border-left:3px solid var(--c-bar);border-radius:var(--r-sm);color:var(--c-text);outline-offset:-2px}
+.grid-name {font-size:var(--fs-cap);font-weight:500;line-height:16px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere}
+.single .grid-name {-webkit-line-clamp:2}
+.grid-room {font-size:var(--fs-micro);line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid-course:active {background:var(--c-bg);filter:brightness(.95)}
+.grid-hint {font-size:var(--fs-cap);line-height:16px;margin-top:8px;color:var(--text-3)}
+#grid tbody {animation:week-in 120ms ease-out}
+#footer {border-top:1px solid var(--border);padding-top:16px;padding-bottom:calc(16px + env(safe-area-\69 nset-bottom));font-size:13px;line-height:20px;text-align:center;color:var(--text-3)}
+#footer>span {display:block}.warning {color:var(--warn)!important}
+.entry {width:100%;max-width:392px;margin:0 auto;padding:18vh 16px 32px;text-align:center}
+.entry-logo {display:block;margin:auto;width:48px;height:48px}
+.entry h1 {font-size:var(--fs-h2);line-height:28px;margin-top:12px}
+.entry>p {font-size:var(--fs-small);line-height:18px;color:var(--text-3);margin-top:12px}
+.entry>.subtitle {margin-top:4px}
+.gate-card {margin-top:32px;text-align:left;padding:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg)}
+.gate-card label {display:block;font-size:var(--fs-small);line-height:18px;font-weight:500;color:var(--text-2);margin-bottom:8px}
+.gate-card input {width:100%;height:48px;padding:0 12px;font-size:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md)}
+.gate-card input:focus {border-color:var(--accent);outline:2px solid var(--focus);outline-offset:2px}
+.gate-card input[aria-invalid="true"] {border-color:var(--danger)}
+#gate-error {font-size:var(--fs-small);line-height:18px;color:var(--danger);margin-top:8px}
+.primary {width:100%;height:48px;margin-top:16px;background:var(--accent);color:var(--on-accent);font-weight:600}
+.primary:disabled {opacity:.5}.primary:active {background:var(--accent);filter:brightness(.92)}
+.entry>.gate-tip {font-size:var(--fs-cap);line-height:16px;margin-top:16px}
+.skeletons {display:flex;flex-direction:column;gap:8px;margin-top:32px}
+.skeletons>div {height:76px;background:var(--surface-2);border-radius:var(--r-md);animation:pulse 1200ms ease-in-out infinite alternate}
+.skeletons>div:last-child {width:60%}
+.cloud.icon {width:48px;height:48px;color:var(--text-3)}
+#fatal h1 {font-size:var(--fs-h3);line-height:24px}
+#fatal-text {font-size:var(--fs-body);line-height:22px;color:var(--text-2)}
+.secondary {border:1px solid var(--border);height:44px;padding:0 20px;margin-top:24px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.sheet {position:fixed;top:0;right:0;bottom:0;left:0;z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.scrim {position:absolute;top:0;right:0;bottom:0;left:0;background:var(--scrim);animation:fade-in 220ms cubic-bezier(.2,0,0,1)}
+.sheet-dialog {position:relative;z-index:1;width:100%;max-height:85vh;max-height:85dvh;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg) var(--r-lg) 0 0;padding:8px 20px calc(20px + env(safe-area-\69 nset-bottom));box-shadow:var(--shadow-sheet);animation:sheet-in 220ms cubic-bezier(.2,0,0,1)}
+.handle {width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 8px}
+.sheet-top {display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--text-3);font-size:var(--fs-small);line-height:18px}
+#sheet-close {width:44px;height:44px;font-size:26px;flex-shrink:0}
+#sheet-name {position:relative;font-size:var(--fs-h2);line-height:28px;padding-left:12px;overflow-wrap:anywhere}
+#sheet-name::before {content:"";position:absolute;top:4px;left:0;width:4px;height:20px;border-radius:2px;background:var(--c-bar)}
+#sheet-facts {border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:12px 0;margin-top:16px}
+.fact {display:flex;align-items:center;min-height:44px;gap:12px}
+.fact dt {display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:var(--fs-small);flex-shrink:0}
+.fact dt span {width:40px}.fact dd {font-size:15px;line-height:22px;overflow-wrap:anywhere;min-width:0}
+#sheet-meetings {margin-top:16px}
+#sheet-meetings h3 {font-size:var(--fs-cap);line-height:16px;font-weight:500;color:var(--text-3);margin-bottom:8px}
+.meeting {display:grid;grid-template-columns:48px 80px 1fr;gap:4px;align-items:center;min-height:40px;border-left:3px solid var(--c-bar);padding-left:8px;font-size:13px;line-height:18px}
+.meeting span {overflow-wrap:anywhere;min-width:0}.meeting.selected {font-weight:600}
+.closing .sheet-dialog {animation:sheet-out 160ms cubic-bezier(.4,0,1,1) forwards}
+.closing .scrim {animation:fade-in 160ms cubic-bezier(.4,0,1,1) reverse forwards}
+@media (hover:hover) {
+ button:not(:disabled):hover {color:var(--text)}
+ .course:hover {border-color:var(--text-3)}
+ .arrow:hover,#sheet-close:hover,.secondary:hover {background:var(--surface-2)}
+ .primary:not(:disabled):hover {color:var(--on-accent);filter:brightness(1.06)}
+ .grid-course:not(:disabled):hover {color:var(--c-text)}
+}
+@media (min-width:600px) {
+ :root {--row-h:52px}
+ .container {padding-left:calc(24px + env(safe-area-\69 nset-left));padding-right:calc(24px + env(safe-area-\69 nset-right))}
+ .grid-name {font-size:13px}
+ #footer>span {display:inline} #footer>span+span::before {content:" · "}
+ .sheet {align-items:center}.sheet-dialog {width:440px;border-radius:var(--r-lg);padding:24px;animation:dialog-in 180ms cubic-bezier(.2,0,0,1)}
+ .handle {display:none}.closing .sheet-dialog {animation:dialog-in 160ms cubic-bezier(.4,0,1,1) reverse forwards}
+}
+@media (min-width:1024px) {
+ :root {--row-h:56px}
+ .container {max-width:1200px;padding-left:calc(32px + env(safe-area-\69 nset-left));padding-right:calc(32px + env(safe-area-\69 nset-right))}
+ .layout {display:grid;grid-template-columns:360px minmax(0,1fr);gap:32px;align-items:start}
+ #pane-today {position:sticky;top:calc(72px + env(safe-area-\69 nset-top))}
+ #footer>.footer-update {display:none}
+}
+@media (max-width:359px) {.unit-col {width:20px}.grid-name {font-size:11px}.week-range {font-size:11px}.week-badge {padding:2px 4px}}
+@media (prefers-color-scheme:dark) {
+ #view-tabs button[aria-selected="true"] {border:1px solid var(--border);box-shadow:none}
+ .grid-course:active {filter:brightness(1.12)}
+}
+@keyframes panel-in {from {opacity:0;transform:translateY(4px)}to {opacity:1;transform:translateY(0)}}
+@keyframes week-in {from {opacity:.4}to {opacity:1}}
+@keyframes pulse {from {opacity:.6}to {opacity:1}}
+@keyframes fade-in {from {opacity:0}to {opacity:1}}
+@keyframes sheet-in {from {transform:translateY(100%)}to {transform:translateY(0)}}
+@keyframes sheet-out {from {transform:translateY(0)}to {transform:translateY(100%)}}
+@keyframes dialog-in {from {opacity:0;transform:scale(.98)}to {opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce) {
+ *,*::before,*::after {transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+ .skeletons>div {animation:none}
 }
-
-/* 深色模式：不是把浅色反相，而是重新定一套——
-   背景压到近黑蓝，玻璃变成「一层微光」而不是「一层白」。 */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* 深色的文字档不是「把浅色提亮」拍出来的，是按最坏情况下的面板亮度
-       反推的。玻璃面板合成后最坏约 #424a68（亮度 0.071，见下方 .blob 的
-       不透明度说明），在这个亮度上达到 4.5:1 需要 L ≥ 79%。于是：
-       --muted 85%、--faint 80%、--accent 86%，各留 5% 余量。
-       实测：5.5:1 / 4.7:1 / 5.4:1。**改这几个数之前先跑一遍对比度，
-       别凭感觉调** —— 深色下差 3% 的 L 就可能掉到 4.5 以下。 */
-    --ink:        oklch(94% 0.030 265);   /* 7.3:1 */
-    --ink-strong: oklch(98% 0.020 265);   /* 8.2:1 */
-    --muted:      oklch(85% 0.045 264);   /* 5.5:1 */
-    --faint:      oklch(80% 0.050 264);   /* 4.7:1 */
-    --accent:     oklch(86% 0.130 264);   /* 5.4:1 */
-    --danger:     oklch(85% 0.130 25);
-
-    --ground:     #0e1224;
-    --panel:      rgba(255, 255, 255, 0.075);
-    --panel-2:    rgba(255, 255, 255, 0.055);
-    --well:       rgba(255, 255, 255, 0.035);
-    --sticky-col: #141a2e;
-    --hairline:   rgba(255, 255, 255, 0.14);
-    --hairline-2: rgba(255, 255, 255, 0.08);
-    --track:      rgba(255, 255, 255, 0.14);
-
-    --glass-bg:
-      linear-gradient(128deg,
-        rgba(255, 255, 255, 0.10) 0%,
-        rgba(255, 255, 255, 0.025) 38%,
-        rgba(255, 255, 255, 0) 62%,
-        rgba(255, 255, 255, 0.05) 100%),
-      linear-gradient(165deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-    --glass-blur: blur(30px) saturate(1.5);
-    --glass-edge:
-      0 30px 64px -30px rgba(0, 0, 0, 0.72),
-      inset 0 1px 1px rgba(255, 255, 255, 0.16),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.05),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.07);
-  }
-}
-
-* { box-sizing: border-box; }
-
-html {
-  background: var(--ground);
-  -webkit-text-size-adjust: 100%;
-  scroll-behavior: smooth;
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  color: var(--ink);
-  font: 15px/1.55 var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-}
-
-button, input { font: inherit; color: inherit; }
-button { border: 0; background: none; cursor: pointer; }
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-[hidden] { display: none !important; }
-
-/* 统一图标尺寸：所有 <svg class="icon"> 都走这里，不在各处零散写宽高 */
-.icon {
-  width: 1.15em;
-  height: 1.15em;
-  display: inline-block;
-  vertical-align: -0.18em;
-  flex: none;
-}
-.icon-whale { width: 1.5em; height: 1.5em; }
-.icon-fatal { width: 46px; height: 46px; color: var(--muted); }
-
-.nowrap { white-space: nowrap; }
-
-/* ==================================================================
-   背景：一层极光 + 一层噪点
-   噪点的作用是压住大面积渐变在深色屏上的色带（banding）。
-   ================================================================== */
-
-.sky {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  background:
-    radial-gradient(118% 88% at 78% -12%, oklch(88% 0.070 262) 0%, transparent 58%),
-    linear-gradient(158deg, oklch(95% 0.030 262) 0%, oklch(89% 0.055 258) 48%,
-      oklch(94% 0.033 268) 100%);
-}
-@media (prefers-color-scheme: dark) {
-  .sky {
-    background:
-      radial-gradient(120% 90% at 76% -14%, oklch(38% 0.110 265) 0%, transparent 56%),
-      radial-gradient(90% 70% at 6% 104%, oklch(32% 0.100 285) 0%, transparent 60%),
-      linear-gradient(158deg, #0b0f20 0%, #111733 50%, #0d1226 100%);
-  }
-}
-
-.blob {
-  position: absolute;
-  display: block;
-  border-radius: 50%;
-  filter: blur(70px);
-  will-change: transform;
-  opacity: 0.72;
-  /* 深色模式下这些光斑的强度直接决定文字对比度：叠得越亮，面板越亮，
-     文字就得越白。下面 dark 覆盖段把整组调到 0.22 以下，就是为了让
-     深色文字档能停在 80–86% 这个还能保持层级的范围里。 */
-}
-@keyframes drift-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to   { transform: translate3d(3vmax, 2vmax, 0) scale(1.10); }
-}
-@keyframes drift-b {
-  from { transform: translate3d(0, 0, 0) scale(1.07); }
-  to   { transform: translate3d(-3vmax, -2vmax, 0) scale(1); }
-}
-.b1 { width: 52vmax; height: 52vmax; left: -16vmax; top: -18vmax;
-      background: radial-gradient(circle at 42% 42%, oklch(78% 0.105 264), transparent 68%);
-      animation: drift-a 40s ease-in-out infinite alternate; }
-.b2 { width: 42vmax; height: 42vmax; right: -14vmax; top: -4vmax; opacity: 0.5;
-      background: radial-gradient(circle at 50% 50%, oklch(58% 0.150 268), transparent 68%);
-      animation: drift-b 48s ease-in-out infinite alternate; }
-.b3 { width: 46vmax; height: 46vmax; left: 4vmax; bottom: -24vmax; opacity: 0.34;
-      background: radial-gradient(circle at 50% 50%, oklch(38% 0.130 266), transparent 70%);
-      animation: drift-a 54s ease-in-out infinite alternate; }
-.b4 { width: 36vmax; height: 36vmax; right: -2vmax; bottom: -16vmax; opacity: 0.56;
-      background: radial-gradient(circle at 50% 50%, oklch(72% 0.110 250), transparent 68%);
-      animation: drift-b 44s ease-in-out infinite alternate; }
-.b5 { width: 28vmax; height: 28vmax; left: 36vmax; top: 6vmax; opacity: 0.30;
-      background: radial-gradient(circle at 50% 50%, oklch(76% 0.090 200), transparent 70%);
-      animation: drift-a 62s ease-in-out infinite alternate; }
-/* 深色下的光斑压得很低（0.14–0.22），原因见上面 .blob 的注释：
-   它们不是装饰，而是文字对比度的分母。 */
-@media (prefers-color-scheme: dark) {
-  .b1 { opacity: 0.22; }
-  .b2 { opacity: 0.18; }
-  .b3 { opacity: 0.16; }
-  .b4 { opacity: 0.16; }
-  .b5 { opacity: 0.12; }
-}
-
-/* SVG feTurbulence 做的细噪点，base64 内联 —— 不额外发请求 */
-.grain {
-  position: absolute;
-  inset: 0;
-  opacity: 0.32;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNDAiIGhlaWdodD0iMTQwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC44NSIgbnVtT2N0YXZlcz0iMyIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxNDAiIGhlaWdodD0iMTQwIiBmaWx0ZXI9InVybCgjbikiLz48L3N2Zz4=");
-  background-size: 140px 140px;
-}
-@media (prefers-color-scheme: dark) {
-  .grain { opacity: 0.20; mix-blend-mode: overlay; }
-}
-
-/* ==================================================================
-   玻璃
-   ================================================================== */
-
-.glass {
-  background: var(--glass-bg);
-  border: 1px solid var(--hairline);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  box-shadow: var(--glass-edge);
-}
-
-/* 不支持 backdrop-filter 的浏览器（老 Firefox、部分国产内核）：
-   退回一层更实的面板色，避免内容直接糊在背景上读不了。 */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass { background: var(--panel); border-color: var(--hairline-2); }
-}
-
-/* ==================================================================
-   加载 / 口令 / 错误
-   ================================================================== */
-
-.state-screen, .gate {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s4);
-  padding: var(--s6);
-  color: var(--muted);
-  text-align: center;
-}
-.state-screen p { margin: 0; font-size: 13px; letter-spacing: 0.02em; }
-
-/* 骨架屏：比转圈更接近「即将出现的内容」的形状，等待感更短 */
-.skeleton {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s3);
-  width: min(420px, 84vw);
-}
-.sk {
-  display: block;
-  height: 58px;
-  border-radius: var(--r-md);
-  background: var(--panel);
-  border: 1px solid var(--hairline);
-  animation: sk-pulse 1.6s var(--ease-in-out) infinite;
-}
-.sk-a { grid-column: 1 / -1; height: 92px; border-radius: var(--r-lg); }
-.sk-d { grid-column: 1 / -1; height: 44px; }
-@keyframes sk-pulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 0.95; }
-}
-
-.outline-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s2);
-  padding: 10px 20px;
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  background: var(--panel-2);
-  color: var(--ink);
-  font-weight: 650;
-  font-size: 14px;
-  transition: background var(--t-fast), transform var(--t-fast);
-}
-.outline-button:hover { background: var(--panel); }
-.outline-button:active { transform: scale(0.97); }
-
-.gate-card {
-  width: min(100%, 356px);
-  padding: var(--s7) var(--s6) var(--s6);
-  border-radius: var(--r-xl);
-  text-align: center;
-}
-.gate-logo, .brand-mark {
-  display: inline-grid;
-  place-items: center;
-  color: oklch(97% 0.02 264);
-  background: linear-gradient(140deg, oklch(34% 0.130 268), oklch(56% 0.150 264));
-  box-shadow: 0 10px 24px -10px oklch(30% 0.120 268 / 0.7),
-              inset 0 1px 0 oklch(100% 0 0 / 0.35);
-}
-.gate-logo {
-  width: 54px; height: 54px;
-  margin-bottom: var(--s4);
-  border-radius: var(--r-md);
-}
-.gate-card h1 {
-  margin: 0 0 var(--s2);
-  font-size: 25px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-  color: var(--ink-strong);
-}
-.gate-card p { margin: 0 0 var(--s5); color: var(--muted); font-size: 13px; }
-.gate-card input {
-  width: 100%;
-  padding: 13px 16px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  background: var(--well);
-  color: var(--ink);
-  text-align: center;
-  font-size: 16px;      /* iOS 上低于 16px 会触发聚焦缩放 */
-  letter-spacing: 0.12em;
-  transition: border-color var(--t-fast), box-shadow var(--t-fast);
-}
-.gate-card input::placeholder { color: var(--faint); letter-spacing: 0; }
-.gate-card input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 4px oklch(52% 0.185 264 / 0.16);
-}
-.gate-card button[type="submit"] {
-  width: 100%;
-  margin-top: var(--s3);
-  padding: 13px;
-  border-radius: var(--r-md);
-  background: linear-gradient(135deg, oklch(34% 0.130 268), oklch(55% 0.170 264));
-  color: oklch(98% 0.01 264);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  box-shadow: 0 12px 26px -12px oklch(34% 0.130 268);
-  transition: filter var(--t-fast), transform var(--t-fast);
-}
-.gate-card button[type="submit"]:hover { filter: brightness(1.06); }
-.gate-card button[type="submit"]:active { transform: scale(0.985); }
-.gate-card button:disabled { opacity: 0.6; cursor: default; }
-.error {
-  margin-top: var(--s3);
-  color: var(--danger);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-/* ==================================================================
-   骨架
-   ================================================================== */
-
-.shell {
-  width: min(1160px, 100%);
-  margin: auto;
-  padding: var(--s6) var(--s5) var(--s7);
-}
-
-/* ==================================================================
-   诗句
-   ================================================================== */
-
-.poem {
-  margin: 0 0 var(--s3);
-  padding: 18px 20px 14px;
-  border-radius: var(--r-lg);
-  text-align: center;
-  overflow: hidden;
-}
-.poem-text {
-  position: relative;
-  display: block;
-  font-family: var(--font-kai);
-  /* 按字数缩放字号，长诗句在窄屏也保持一行，不裁字、不横向溢出。
-   *
-   * 公式里的数字是量出来的，不是估的：汉字全角，一个字正好 1em 宽，
-   * 再加 letter-spacing .05em。容器内宽 = 100vw - .shell 两侧内边距
-   * - .poem 两侧内边距。手机上（:root 的 --poem-gutter 会变小）
-   * 16 字最多占到 100vw - 56px，除以字数再乘 .92 留出余量。
-   * 实测修正过一次：原来的 /1.06 系数偏乐观，16 字的诗句在 390px 上会折行。 */
-  font-size: clamp(12px,
-    calc((100vw - var(--poem-gutter, 88px)) / var(--poem-length, 16) * 0.92),
-    21px);
-  line-height: 1.75;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  color: var(--ink-strong);
-}
-.poem-accessible {
-  position: absolute;
-  width: 1px; height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-.poem-char {
-  display: inline-block;
-  animation: poem-emerge 1.7s var(--ease-out) both;
-}
-.poem-char-upper { --poem-offset: -14px; }
-.poem-char-lower { --poem-offset: 14px; }
-@keyframes poem-emerge {
-  from { opacity: 0; transform: translateY(var(--poem-offset)); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.poem-from {
-  display: block;
-  margin-top: var(--s2);
-  color: var(--faint);
-  font-family: var(--font-serif);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  animation: fade-in 0.9s var(--ease-out) 0.7s both;
-}
-@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-/* ==================================================================
-   顶栏
-   ================================================================== */
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s4);
-  margin-bottom: var(--s3);
-  padding: var(--s2) var(--s4);
-  border-radius: 18px;
-}
-.brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
-.brand-mark {
-  width: 40px; height: 40px;
-  border-radius: var(--r-sm);
-  color: oklch(98% 0.01 264);
-}
-.brand-text { min-width: 0; }
-.brand h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.03em; }
-.brand p {
-  margin: 1px 0 0;
-  color: var(--muted);
-  font-size: 11.5px;
-  letter-spacing: 0.01em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sync-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 12px 6px 10px;
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  background: var(--well);
-  color: var(--muted);
-  font-size: 11.5px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-/* 只在真的有数据更新时呼吸；这是「活着」的反馈，不是装饰 */
-.live-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: oklch(68% 0.150 155);
-  box-shadow: 0 0 0 0 oklch(68% 0.150 155 / 0.5);
-  animation: live 2.6s var(--ease-out) infinite;
-}
-@keyframes live {
-  0%   { box-shadow: 0 0 0 0 oklch(68% 0.150 155 / 0.5); }
-  70%  { box-shadow: 0 0 0 7px oklch(68% 0.150 155 / 0); }
-  100% { box-shadow: 0 0 0 0 oklch(68% 0.150 155 / 0); }
-}
-
-/* ==================================================================
-   首屏
-   ================================================================== */
-
-.hero {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 232px;
-  gap: var(--s5);
-  align-items: end;
-  overflow: hidden;
-  padding: var(--s6) var(--s6) var(--s6);
-  border-radius: var(--r-xl);
-}
-/* 右下角的一圈同心弧：纯几何装饰，作为「学年 / 周次」的视觉隐喻 */
-.hero::after {
-  content: "";
-  position: absolute;
-  right: -120px;
-  bottom: -160px;
-  width: 330px;
-  height: 330px;
-  border: 1px solid var(--hairline);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 32px oklch(100% 0 0 / 0.10),
-    0 0 0 64px oklch(100% 0 0 / 0.055);
-  pointer-events: none;
-}
-.hero-main { position: relative; z-index: 1; min-width: 0; }
-.eyebrow {
-  margin: 0 0 var(--s3);
-  color: var(--muted);
-  font-family: var(--font-num);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-}
-.hero h2 {
-  max-width: 17em;
-  margin: 0;
-  color: var(--ink-strong);
-  font-family: var(--font-serif);
-  /* 与 15px 正文形成 2.5× 以上的层级差 */
-  font-size: clamp(25px, 3.9vw, 40px);
-  font-weight: 700;
-  line-height: 1.16;
-  letter-spacing: -0.045em;
-  text-wrap: pretty;
-}
-.hero-date {
-  margin: var(--s4) 0 0;
-  color: var(--muted);
-  font-size: 13.5px;
-}
-/* 「下一节课」：把原来那句没有信息量的口号换成真正有用的提示 */
-.hero-next {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-  margin: var(--s4) 0 0;
-  padding: 0;
-  list-style: none;
-}
-.hero-next li {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: 100%;
-  padding: 6px 12px;
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  background: var(--well);
-  color: var(--ink);
-  font-size: 12.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hero-next b {
-  color: var(--accent);
-  font-family: var(--font-num);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.week-card {
-  position: relative;
-  z-index: 1;
-  padding: var(--s4) var(--s4) var(--s3);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-lg);
-  background: var(--well);
-  box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.45);
-}
-@media (prefers-color-scheme: dark) {
-  .week-card { box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.10); }
-}
-.week-card-label { color: var(--muted); font-size: 11.5px; letter-spacing: 0.04em; }
-.week-card strong {
-  display: block;
-  margin-top: 2px;
-  color: var(--ink-strong);
-  font-family: var(--font-num);
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  line-height: 1.1;
-}
-.progress {
-  height: 4px;
-  margin: var(--s3) 0 var(--s2);
-  border-radius: 99px;
-  background: var(--track);
-  overflow: hidden;
-}
-.progress i {
-  display: block;
-  width: 0;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, oklch(40% 0.140 268), oklch(70% 0.130 262));
-  transition: width 900ms var(--ease-out);
-}
-@media (prefers-color-scheme: dark) {
-  .progress i { background: linear-gradient(90deg, oklch(60% 0.150 268), oklch(82% 0.110 260)); }
-}
-.week-card small { color: var(--faint); font-size: 11px; letter-spacing: 0.02em; }
-
-/* ==================================================================
-   工具栏
-   ================================================================== */
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  /* flex-wrap 是必须的：.week-nav 里的三个控件都有硬宽度（32+76+32+边距），
-     不换行时它会把「下一周」挤出屏幕右侧——实测在 390px 上就发生了。
-     min-width:0 同理，否则 flex 子项不肯收缩到内容宽度以下。 */
-  flex-wrap: wrap;
-  gap: var(--s2) var(--s3);
-  margin: var(--s3) 0 var(--s3);
-}
-.segmented { display: flex; gap: 2px; padding: 3px; border-radius: var(--r-md); min-width: 0; }
-.view-tab {
-  min-width: 72px;
-  min-height: 38px;          /* 触摸目标不低于 38px，手指点得中 */
-  padding: 8px 16px;
-  border-radius: 13px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  transition: background var(--t-fast), color var(--t-fast);
-}
-.view-tab:hover { color: var(--ink); }
-.view-tab.active {
-  background: var(--panel);
-  color: var(--ink-strong);
-  font-weight: 750;
-  box-shadow: 0 4px 12px -5px rgba(24, 38, 92, 0.30),
-              inset 0 1px 0 oklch(100% 0 0 / 0.6);
-}
-@media (prefers-color-scheme: dark) {
-  .view-tab.active { box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.14); }
-}
-
-.week-nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px 5px;
-  border-radius: var(--r-md);
-  /* 换行之后靠右对齐，单独占一行时也不会贴着左边 */
-  margin-left: auto;
-}
-.week-arrow {
-  display: grid;
-  place-items: center;
-  width: 34px; height: 34px;   /* 触摸目标不低于 34px */
-  border-radius: 10px;
-  color: var(--muted);
-  transition: background var(--t-fast), color var(--t-fast);
-}
-.week-arrow .icon { width: 16px; height: 16px; }
-.week-arrow:hover { background: var(--panel); color: var(--ink-strong); }
-.week-current {
-  min-width: 76px;
-  padding: 0 8px;
-  color: var(--ink);
-  font-family: var(--font-num);
-  font-size: 13px;
-  font-weight: 750;
-  letter-spacing: -0.01em;
-}
-.week-current:hover { color: var(--accent); }
-
-/* ==================================================================
-   今日视图
-   ================================================================== */
-
-.content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 296px;
-  gap: var(--s3);
-}
-.panel { border-radius: var(--r-lg); }
-.panel-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s3);
-  padding: var(--s5) var(--s5) var(--s2);
-}
-.panel-heading h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: var(--ink-strong);
-}
-.panel-heading span { color: var(--muted); font-size: 12px; }
-.panel-hint { white-space: nowrap; }
-
-.course-list { padding: var(--s3) var(--s3) var(--s3); }
-
-/* 课程行：左侧一条按课程名生成的色条，中间课名，右侧时间与教室。
-   时间放右边是为了让「几点上什么课」这件事一眼扫得下来。 */
-.course {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--s4);
-  align-items: center;
-  width: 100%;
-  margin-bottom: var(--s2);
-  padding: var(--s3) var(--s4) var(--s3) 18px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  background: var(--panel-2);
-  text-align: left;
-  overflow: hidden;
-  transition: background var(--t-base), border-color var(--t-base),
-              transform var(--t-base) var(--ease-out);
-}
-/* 色条用 ::before 而不是 inset box-shadow —— 圆角处不会被裁成直角 */
-.course::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: var(--tone);
-  opacity: 0.9;
-}
-.course:hover {
-  background: var(--panel);
-  border-color: var(--tone);
-  transform: translateX(2px);
-}
-.course:last-child { margin-bottom: 0; }
-.course-name {
-  margin: 0;
-  color: var(--ink-strong);
-  font-size: 15px;
-  font-weight: 650;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-.course-meta {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.course-meta .sep { color: var(--faint); margin: 0 5px; }
-.course-time {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  text-align: right;
-  white-space: nowrap;
-}
-.course-time strong {
-  color: var(--ink-strong);
-  font-family: var(--font-num);
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1;
-}
-.course-time .unit-label {
-  color: var(--muted);
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-/* 正在上的那节课：加一层柔和的光晕，扫一眼就知道现在到哪儿了 */
-
-/* 空状态与提示 */
-.empty-demo {
-  padding: 46px 20px;
-  text-align: center;
-  color: var(--muted);
-}
-.empty-demo b {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--ink-strong);
-  font-size: 21px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-}
-.empty-demo span { font-size: 12.5px; }
-.notice {
-  margin-bottom: var(--s2);
-  padding: var(--s3) var(--s4);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  background: var(--well);
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.6;
-}
-
-/* --- 侧栏 --- */
-.side-panel { align-self: start; }
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s2);
-  padding: 0 var(--s4) var(--s4);
-}
-.stat {
-  padding: var(--s3) var(--s3) 11px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-sm);
-  background: var(--well);
-}
-.stat b {
-  display: block;
-  color: var(--ink-strong);
-  font-family: var(--font-num);
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.05em;
-  line-height: 1.1;
-}
-.stat span { color: var(--muted); font-size: 11px; letter-spacing: 0.02em; }
-.stat-wide { grid-column: 1 / -1; }
-.stat-wide b { font-size: 16px; letter-spacing: -0.02em; font-family: var(--font-sans); }
-
-/* 每天课时数的一行小柱图：比数字更快看出这周的松紧 */
-.busy { padding: 0 var(--s4) var(--s4); }
-.busy-title {
-  margin: 0 0 var(--s2);
-  color: var(--muted);
-  font-size: 11.5px;
-  letter-spacing: 0.04em;
-}
-.busy-row {
-  display: grid;
-  /* 首列 30px 是量出来的：11.5px 字号下「周一」两个字要 23px，
-     原来的 18px 放不下，浏览器只能把两个字竖着排（截图上看到的「周/一」）。 */
-  grid-template-columns: 30px minmax(0, 1fr) 24px;
-  align-items: center;
-  gap: var(--s2);
-  margin-bottom: 6px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-.busy-bar {
-  height: 6px;
-  border-radius: 99px;
-  background: var(--track);
-  overflow: hidden;
-}
-.busy-bar i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, oklch(44% 0.140 268), oklch(66% 0.140 262));
-  transition: width 700ms var(--ease-out);
-}
-@media (prefers-color-scheme: dark) {
-  .busy-bar i { background: linear-gradient(90deg, oklch(62% 0.150 268), oklch(80% 0.120 260)); }
-}
-.busy-row.is-zero { opacity: 0.42; }
-.busy-row.is-today { color: var(--ink-strong); font-weight: 700; }
-.busy-count {
-  text-align: right;
-  font-family: var(--font-num);
-  font-weight: 700;
-}
-
-/* ==================================================================
-   周课表
-   ================================================================== */
-
-.week-panel { margin-top: var(--s3); }
-.grid-scroll {
-  /* 横向留白抽成变量：节次列冻结时要贴住这道留白的外沿（见 .schedule .unit），
-     写死的话桌面和手机两套 padding 就没法共用同一条规则。 */
-  --grid-pad-x: var(--s4);
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: var(--s2) var(--grid-pad-x) var(--s4);
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-}
-.schedule {
-  width: 100%;
-  /* 最小宽度按「节次列 + 每列最小宽 × 列数」算，列数由 app.js 按数据写在
-     --day-cols 上（周一到周五恒显，整学期没课的周末不占列）。这样手机上横滑
-     的距离跟着真实列数走，不会被一个写死的 820px 拖着多滑两百多像素。 */
-  --col-min: 104px;
-  min-width: calc(
-    var(--unit-col) + var(--col-min) * var(--day-cols, 7) +
-    3px * (var(--day-cols, 7) + 1)
-  );
-  border-collapse: separate;
-  border-spacing: 3px;
-  table-layout: fixed;
-}
-
-/* 表头：星期 + 日期。当天用一条短横线标记，不用整格变色——
-   整格变色会在 7 列里制造一个假焦点。 */
-.schedule th {
-  height: 46px;
-  padding: 2px 0 4px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.schedule .day-date {
-  display: block;
-  margin-top: 2px;
-  color: var(--faint);
-  font-family: var(--font-num);
-  font-size: 11.5px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-}
-.schedule th.today { color: var(--ink-strong); }
-.schedule th.today .day-date { color: var(--accent); }
-.schedule th.today::after {
-  content: "";
-  display: block;
-  width: 22px;
-  height: 2px;
-  margin: 5px auto 0;
-  border-radius: 2px;
-  background: var(--accent);
-}
-.schedule th.weekend { color: var(--faint); }
-.schedule th.weekend .day-date { color: var(--faint); opacity: 0.8; }
-
-/* 节次列（第 1 节…第 11 节）：手机横滑时钉在最左边。
-   不钉的话滑到周四、周五就失去了「这是第几节」的参照，只能来回蹭着找。 */
-.schedule .unit {
-  position: sticky;
-  /* 停在留白的**外沿**，不是内容边缘：滚动容器的 padding 区照样会渲染滚过去
-     的内容，只贴内容边缘会在左边漏出一条 12px 的残影。负值让它退到 padding
-     box 左沿，把那条缝一并盖住。没滚动时它离得比这远，所以不会自己挪位。 */
-  left: calc(-1 * var(--grid-pad-x));
-  z-index: 3;
-  width: var(--unit-col);
-  color: var(--faint);
-  font-family: var(--font-num);
-  font-size: 12.5px;
-  font-weight: 700;
-  background: var(--sticky-col);
-  border-radius: 6px;
-  /* 向外扩一圈同色。冻结列本身盖得住内容，但单元格之间 3px 的 border-spacing
-     和圆角缺口盖不住——滑过去的课名正从这些缝里漏出来，在列上拉出一道道
-     横纹。2.5px 的外扩刚好填掉 3px 的缝和 6px 圆角的缺口。 */
-  box-shadow: 0 0 0 3px var(--sticky-col);
-}
-.schedule td {
-  height: var(--grid-row);
-  padding: 0;
-  vertical-align: top;
-  border-radius: var(--r-sm);
-  background: var(--well);
-}
-.schedule td.is-today { background: oklch(70% 0.100 264 / 0.16); }
-
-/* 课程块：与今日视图共用同一套课程色，颜色在页面里是同一件事 */
-.schedule .course-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 100%;
-  height: 100%;
-  padding: 9px 10px;
-  border: 1px solid var(--course-border, transparent);
-  border-left: 3px solid var(--tone);
-  border-radius: 11px;
-  background: var(--tone-soft);
-  color: var(--tone-text);
-  text-align: left;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.35;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  transition: filter var(--t-base), transform var(--t-base);
-}
-.schedule .course-block:hover { filter: brightness(0.97); }
-@media (prefers-color-scheme: dark) {
-  .schedule .course-block:hover { filter: brightness(1.12); background: var(--tone-soft); }
-}
-.schedule .course-block:active { transform: scale(0.985); }
-.schedule .course-block small {
-  color: inherit;
-  opacity: 0.72;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-/* 连堂时行高翻倍，课名有更多机会完整显示 */
-.schedule .course-block.span-multi { justify-content: center; }
-.grid-hint {
-  margin: 0 0 var(--s4);
-  color: var(--faint);
-  text-align: center;
-  font-size: 12px;
-}
-
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s2);
-  margin-top: var(--s5);
-  color: var(--faint);
-  font-size: 11.5px;
-  letter-spacing: 0.01em;
-}
-.footer .dot { opacity: 0.5; }
-.footer .stale { color: oklch(62% 0.140 62); font-weight: 700; }
-@media (prefers-color-scheme: dark) {
-  .footer .stale { color: oklch(80% 0.130 70); }
-}
-
-/* ==================================================================
-   课程详情
-   ================================================================== */
-
-.sheet {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--s5);
-}
-.sheet-mask {
-  position: absolute;
-  inset: 0;
-  background: oklch(24% 0.06 268 / 0.42);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  animation: fade-in 180ms var(--ease-out) both;
-}
-.sheet-card {
-  position: relative;
-  width: min(452px, 100%);
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  padding: var(--s6) var(--s6) var(--s5);
-  border-radius: var(--r-xl);
-  color: var(--ink);
-  animation: sheet-in 260ms var(--ease-out);
-}
-@keyframes sheet-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to   { opacity: 1; transform: none; }
-}
-.sheet-close {
-  position: absolute;
-  top: var(--s3);
-  right: var(--s3);
-  display: grid;
-  place-items: center;
-  width: 32px; height: 32px;
-  border: 1px solid var(--hairline);
-  border-radius: 10px;
-  background: var(--well);
-  color: var(--muted);
-  transition: background var(--t-fast), color var(--t-fast);
-}
-.sheet-close:hover { background: var(--panel); color: var(--ink-strong); }
-.sheet-close .icon { width: 15px; height: 15px; }
-.sheet-tag {
-  margin: 0 0 var(--s2);
-  color: var(--accent);
-  font-size: 11.5px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-}
-.sheet-card h2 {
-  margin: 0 40px var(--s4) 0;
-  color: var(--ink-strong);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.35;
-  letter-spacing: -0.03em;
-  overflow-wrap: anywhere;
-  text-wrap: pretty;
-}
-/* 这门课在一周里的每一次排课，都列出来 —— 原来只显示被点的那一条，
-   同学看不到「这门课一周上几次、在哪几天」。 */
-.meetings {
-  margin: 0 0 var(--s4);
-  padding: 0;
-  list-style: none;
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  overflow: hidden;
-}
-.meetings li {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  padding: 10px var(--s3);
-  background: var(--well);
-  font-size: 13.5px;
-  color: var(--ink);
-}
-.meetings li + li { border-top: 1px solid var(--hairline); }
-.meetings .day {
-  min-width: 44px;
-  color: var(--ink-strong);
-  font-weight: 700;
-}
-.meetings .periods {
-  color: var(--muted);
-  font-family: var(--font-num);
-  font-weight: 650;
-}
-.meetings .room {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 12.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detail-list {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 9px var(--s3);
-  margin: 0;
-  padding-top: var(--s4);
-  border-top: 1px solid var(--hairline);
-  font-size: 14px;
-}
-.detail-list dt {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--faint);
-  font-size: 12px;
-}
-.detail-list dt .icon { width: 13px; height: 13px; }
-.detail-list dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
-
-/* ==================================================================
-   响应式
-   ================================================================== */
-
-@media (max-width: 900px) {
-  .content { grid-template-columns: 1fr; }
-  .hero { grid-template-columns: 1fr; align-items: stretch; gap: var(--s4); }
-  .hero::after { display: none; }
-  .week-card { padding: var(--s4); }
-}
-
-@media (max-width: 620px) {
-  .shell { padding: var(--s4) 14px var(--s6); }
-  /* 手机上 .shell 与 .poem 的内边距都变窄了，诗句能用的宽度和桌面上不同，
-     --poem-gutter 要跟着变，否则字号会被算大、诗句又折行。 */
-  :root { --poem-gutter: 56px; }
-  .poem { padding: 15px 14px 12px; border-radius: 18px; }
-  .topbar { padding: 7px var(--s3); border-radius: var(--r-md); }
-  .brand-mark { width: 36px; height: 36px; }
-  .brand h1 { font-size: 16px; }
-  .brand p { font-size: 11px; }
-  /* 窄屏上「每日 07:00」这行太长，只留那个呼吸点 */
-  .sync-note { padding: 6px 9px; font-size: 0; gap: 0; }
-  .sync-note::before { content: ""; }
-  .live-dot { width: 7px; height: 7px; }
-
-  .hero { padding: var(--s5) var(--s5); border-radius: var(--r-lg); }
-  .hero h2 { font-size: clamp(23px, 7.4vw, 30px); }
-  .hero-next li { font-size: 12px; }
-
-  .toolbar { margin: var(--s3) 0; }
-  .segmented { flex: 1; }
-  .view-tab { flex: 1; min-width: 0; padding: 9px 10px; }
-  .week-current { min-width: 68px; }
-
-  .panel-heading { padding: var(--s4) var(--s4) var(--s2); }
-  .course-list { padding: var(--s2); }
-  /* 手机上课程行改成两行：课名与时间在第一行，教室在第二行 */
-  .course {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--s2) var(--s3);
-    padding: var(--s3) var(--s3) var(--s3) 15px;
-  }
-  .course-time strong { font-size: 17px; }
-
-  .stats { padding: 0 var(--s3) var(--s3); }
-  .busy { padding: 0 var(--s3) var(--s3); }
-  .grid-scroll { --grid-pad-x: var(--s3); padding: var(--s2) var(--grid-pad-x) var(--s3); }
-  /* 手机上列收窄到 96px：17 字的最长课名仍只折三行，但五列的整表
-     从原来写死的 820px 降到约 570px，横滑距离少了一半。 */
-  .schedule { --col-min: 96px; }
-  .schedule .course-block { font-size: 13px; padding: 8px 9px; }
-
-  .sheet { padding: var(--s3); align-items: flex-end; }
-  .sheet-card { border-radius: var(--r-lg); padding: var(--s5) var(--s5) var(--s4); }
-  .detail-list { grid-template-columns: 52px minmax(0, 1fr); }
-}
-
-/* 超窄屏（iPhone SE 一代那种） */
-@media (max-width: 360px) {
-  .stat b { font-size: 19px; }
-  .hero h2 { font-size: 22px; }
-}
-
-/* ==================================================================
-   无障碍：减少动效
-   ================================================================== */
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  .blob { animation: none !important; }
-  .live-dot { animation: none; }
-  .sk { animation: none; opacity: 0.8; }
-  .poem-char { animation: none; }
-  .poem-from { animation: none; }
-  .sheet-card, .sheet-mask { animation: none; }
-  .course, .progress i, .busy-bar i { transition: none; }
-}
-
-/* 打印：把玻璃去掉，保证能印出清晰的黑白课表 */
 @media print {
-  .sky, .poem, .topbar, .toolbar, .footer, .grid-hint { display: none !important; }
-  .glass { background: none; border-color: #ccc; box-shadow: none; backdrop-filter: none; }
-  body { color: #000; }
+ :root {--bg:#fff;--surface:#fff;--surface-2:#fff;--accent-soft:#fff;--text:#161A1A;--text-2:#475150;--text-3:#475150;--row-h:40px;color-scheme:light}
+ html,body {background:#fff!important;color:#161A1A}
+ .topbar,.week-nav button,#footer,.sheet,.grid-hint,.poem {display:none!important}
+ .week-nav #week-label {display:block!important;opacity:1}
+ .layout {display:block;padding:0;max-width:none}
+ #app #pane-today,#app #pane-week {display:block!important;position:static;margin-bottom:24px}
+ .course,.grid-course,#grid .is-today {background:#fff!important;border:1px solid var(--border)}
+ .grid-scroll {overflow:visible}#grid {min-width:0!important}.grid-course {color:var(--c-text);print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
+
+[data-tone="0"] {--c-bg:#E4EDFC;--c-text:#1C4FC4;--c-bar:#3B7BEA}
+[data-tone="1"] {--c-bg:#DCF2EE;--c-text:#0B655C;--c-bar:#16A594}
+[data-tone="2"] {--c-bg:#E3F3DF;--c-text:#2C641C;--c-bar:#4AA342}
+[data-tone="3"] {--c-bg:#FAEFCF;--c-text:#714C00;--c-bar:#D89A00}
+[data-tone="4"] {--c-bg:#FCE7D9;--c-text:#8E3A08;--c-bar:#E8752A}
+[data-tone="5"] {--c-bg:#FBE3EA;--c-text:#9C1F47;--c-bar:#DE4677}
+[data-tone="6"] {--c-bg:#EEE6FB;--c-text:#5B2FAE;--c-bar:#8C5FE3}
+[data-tone="7"] {--c-bg:#E6E9EE;--c-text:#384353;--c-bar:#77849A}
+@media (prefers-color-scheme:dark) {
+[data-tone="0"] {--c-bg:#1A2A46;--c-text:#AECBFF;--c-bar:#5E9BFF}
+[data-tone="1"] {--c-bg:#12332F;--c-text:#93E2D5;--c-bar:#2EC2AE}
+[data-tone="2"] {--c-bg:#1B3320;--c-text:#AADF9E;--c-bar:#5DBF5B}
+[data-tone="3"] {--c-bg:#382D10;--c-text:#F2D27C;--c-bar:#DDAE3C}
+[data-tone="4"] {--c-bg:#3C2415;--c-text:#FFBC8E;--c-bar:#EE8A47}
+[data-tone="5"] {--c-bg:#3D1B27;--c-text:#FFADC5;--c-bar:#EC6C94}
+[data-tone="6"] {--c-bg:#2C2246;--c-text:#CFB9FF;--c-bar:#A27FF0}
+[data-tone="7"] {--c-bg:#252B33;--c-text:#C5CEDA;--c-bar:#8D9AAC}
+}
+@media print {
+[data-tone="0"] {--c-bg:#E4EDFC;--c-text:#1C4FC4;--c-bar:#3B7BEA}
+[data-tone="1"] {--c-bg:#DCF2EE;--c-text:#0B655C;--c-bar:#16A594}
+[data-tone="2"] {--c-bg:#E3F3DF;--c-text:#2C641C;--c-bar:#4AA342}
+[data-tone="3"] {--c-bg:#FAEFCF;--c-text:#714C00;--c-bar:#D89A00}
+[data-tone="4"] {--c-bg:#FCE7D9;--c-text:#8E3A08;--c-bar:#E8752A}
+[data-tone="5"] {--c-bg:#FBE3EA;--c-text:#9C1F47;--c-bar:#DE4677}
+[data-tone="6"] {--c-bg:#EEE6FB;--c-text:#5B2FAE;--c-bar:#8C5FE3}
+[data-tone="7"] {--c-bg:#E6E9EE;--c-text:#384353;--c-bar:#77849A}
 }

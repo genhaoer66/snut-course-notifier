@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-preview-results="[{&quot;name&quot;:&quot;无脚本错误&quot;,&quot;pass&quot;:true},{&quot;name&quot;:&quot;只请求合成接口&quot;,&quot;pass&quot;:true},{&quot;name&quot;:&quot;页面无横向溢出&quot;,&quot;pass&quot;:true},{&quot;name&quot;:&quot;今日日期&quot;,&quot;pass&quot;:true},{&quot;name&quot;:&quot;首卡教室在首屏&quot;,&quot;pass&quot;:true}]"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>课格 · 陕西理工大学班级课表</title>
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F5F6F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1213" media="(prefers-color-scheme: dark)">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="陕西理工大学班级课表，每日 07:00 更新，随时查看今日课程与整周课表。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="课格">
+<meta property="og:title" content="课格 · 陕西理工大学班级课表">
+<meta property="og:description" content="每天 07:00 更新 · 今日课程与整周课表">
+<meta property="og:url" content="{OG_BASE}/">
+<meta property="og:image" content="{OG_BASE}../web/og-cover.png?v=20261024.1">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="课格，陕西理工大学班级课表">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="课格 · 陕西理工大学班级课表">
+<meta name="twitter:description" content="每天 07:00 更新 · 今日课程与整周课表">
+<meta name="twitter:image" content="{OG_BASE}../web/og-cover.png?v=20261024.1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230D7268'/%3E%3Cg fill='none' stroke='white' stroke-opacity='.55' stroke-width='3'%3E%3Crect x='9' y='9' width='20' height='20' rx='4'/%3E%3Crect x='9' y='35' width='20' height='20' rx='4'/%3E%3Crect x='35' y='35' width='20' height='20' rx='4'/%3E%3C/g%3E%3Crect x='35' y='9' width='20' height='20' rx='4' fill='white'/%3E%3C/svg%3E">
+<link rel="icon" type="image/x-icon" href="../web/favicon.ico?v=20261024.1">
+<link rel="icon" type="image/svg+xml" href="../web/favicon.svg?v=20261024.1">
+<link rel="apple-touch-icon" href="../web/apple-touch-icon.png?v=20261024.1">
+<link rel="stylesheet" href="../web/style.css?v=20261024.1">
+<script>
+var previewMode=new URLSearchParams(location.search).get('mode')||'today';
+var fixture={"updated_at":"2026-10-22 07:00","updated_ts":1792623600,"semester_start":"2026-08-31","current_week":8,"server_today":"2026-10-22","unit_count":11,"periods":null,"courses":[{"name":"汽车构造","teachers":"示例教师甲","room":"7号楼 7203","day":3,"units":[0,1],"weeks":[8,9,10,17]},{"name":"机械设计基础","teachers":"示例教师乙","room":"7号楼 7105","day":3,"units":[2,3],"weeks":[8,9,10,17]},{"name":"工程力学","teachers":"示例教师丙","room":"8号楼 8201","day":0,"units":[0,1],"weeks":[9,17]},{"name":"高等数学","teachers":"示例教师丁","room":"A101","day":1,"units":[4,5],"weeks":[8,9,17]},{"name":"大学英语","teachers":"示例教师戊","room":"B202","day":2,"units":[6,7],"weeks":[8,9,17]},{"name":"材料成型","teachers":"","room":"","day":4,"units":[8,9],"weeks":[8,9,17]}]};
+window.previewRequests=[];
+window.previewErrors=[];
+window.addEventListener('error',function(e){previewErrors.push(e.message)});
+var store={};
+Object.defineProperty(window,'localStorage',{value:{getItem:function(k){return store[k]||null},setItem:function(k,v){store[k]=v},removeItem:function(k){delete store[k]}}});
+if(previewMode==='expired')store['snut.token']='invalid';
+if(['week','weekend','bounds'].indexOf(previewMode)!==-1)store['snut.view']='week';
+if(previewMode==='weekend')fixture.courses.push({name:'周末示例课',room:'C303',teachers:'示例教师',day:5,units:[0,1],weeks:[8,9]});
+if(previewMode==='empty')fixture.server_today='2026-10-24';
+if(previewMode==='unconfigured'){fixture.current_week=null;fixture.semester_start=null}
+if(previewMode==='periods')fixture.periods=Array.from({length:11},function(){return ['08:00','08:45']});
+if(previewMode==='xss')fixture.courses[0].name='<img src=x onerror=alert(1)>';
+window.fetch=function(path,opts){
+ previewRequests.push({path:path,options:opts});
+ var status=200,body=fixture;
+ if(['gate','expired','lock'].indexOf(previewMode)!==-1){status=401;body={error:'需要访问口令'}}
+ if(path==='/api/login'){status=previewMode==='lock'?429:200;body=status===429?{code:'locked',error:'口令错误次数过多，请 3 秒后再试'}:{ok:true,token:null}}
+ if(previewMode==='no-data'){status=503;body={code:'no_data',error:'课表数据还没生成',hint:'合成提示：请等待更新'}}
+ if(previewMode==='network')return Promise.reject(new Error('合成断网'));
+ return Promise.resolve({status:status,json:function(){return Promise.resolve(body)}});
+};
+window.addEventListener('DOMContentLoaded',function(){setTimeout(function(){
+ if(['sheet'].indexOf(previewMode)!==-1)document.querySelector('.course').click();
+ if(previewMode==='lock'){document.getElementById('gate-input').value='wrong';document.getElementById('gate-form').dispatchEvent(new Event('submit',{cancelable:true}))}
+ var results=[];
+ function check(name,pass){results.push({name:name,pass:!!pass})}
+ var app=document.getElementById('app');
+ check('无脚本错误',previewErrors.length===0);
+ check('只请求合成接口',previewRequests.every(function(r){return r.path==='/api/timetable'||r.path==='/api/login'}));
+ if(!app.hidden){
+ check('页面无横向溢出',document.documentElement.scrollWidth<=innerWidth);
+ check('今日日期',document.getElementById('today-date').textContent.indexOf('第 8 周')!==-1||previewMode==='unconfigured');
+ var first=document.querySelector('.course');
+ if(first&&!document.getElementById('pane-today').hidden)check('首卡教室在首屏',first.querySelector('.course-room').getBoundingClientRect().bottom<=innerHeight);
+ if(!document.getElementById('pane-week').hidden){
+  check('十一节',document.querySelectorAll('#grid tbody tr').length===11);
+  check('工作日不横滑',previewMode==='weekend'||document.getElementById('grid-scroll').scrollWidth<=document.getElementById('grid-scroll').clientWidth+1);
+ }
+ if(previewMode==='empty')check('下周课匹配',document.querySelector('.next-course').textContent.indexOf('工程力学')!==-1);
+ if(previewMode==='xss')check('外部字符串无HTML执行',document.querySelectorAll('#today-list img').length===0&&document.querySelector('.course-name').textContent.indexOf('<img')===0);
+ if(previewMode==='bounds'){
+ var prev=document.getElementById('week-prev'),next=document.getElementById('week-next');
+ for(var i=0;i<25;i++)prev.click();check('第一周禁用',prev.disabled);
+ for(var j=0;j<25;j++)next.click();check('最大周禁用',next.disabled);
+ document.getElementById('week-reset').click();check('回本周',document.getElementById('week-label').textContent.indexOf('第 8 周')!==-1);
+ }
+}
+if(previewMode==='expired')check('过期提示',document.getElementById('gate-error').textContent.indexOf('已过期')!==-1);
+if(previewMode==='no-data')check('503提示',document.getElementById('fatal-hint').textContent.indexOf('合成提示')!==-1);
+if(previewMode==='network')check('断网提示',document.getElementById('fatal-text').textContent.indexOf('连不上')!==-1);
+document.documentElement.setAttribute('data-preview-results',JSON.stringify(results));
+},300)});
+</script><script defer="" src="../web/app.js?v=20261024.1"></script>
+</head>
+<body>
+<svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+<symbol id="i-logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0D7268"></rect><g fill="none" stroke="#FFF" stroke-opacity=".55" stroke-width="3"><rect x="9" y="9" width="20" height="20" rx="4"></rect><rect x="9" y="35" width="20" height="20" rx="4"></rect><rect x="35" y="35" width="20" height="20" rx="4"></rect></g><rect x="35" y="9" width="20" height="20" rx="4" fill="#FFF"></rect></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"></path><circle cx="12" cy="10" r="2"></circle></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"></circle><path d="M4 21v-2a8 8 0 0 1 16 0v2"></path></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 11h18M8 2v6M16 2v6"></path></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="m3 3 18 18M5 17a5 5 0 0 1-1-9m4-3a6 6 0 0 1 10 3 5 5 0 0 1 2 9M9 17h5"></path></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 14 0M19 17a8 8 0 0 1-14 0"></path></symbol>
+</defs></svg>
+<main id="boot" class="entry" aria-busy="false" aria-label="正在加载课表" hidden="">
+<svg class="entry-logo" aria-hidden="true"><use href="#i-logo"></use></svg><p role="status">正在加载课表…</p>
+<div class="skeletons" aria-hidden="true"><div></div><div></div><div></div></div>
+</main>
+<main id="gate" class="entry" hidden="">
+<svg class="entry-logo" aria-hidden="true"><use href="#i-logo"></use></svg><h1>课格</h1><p class="subtitle">陕西理工大学 · 班级课表</p>
+<form id="gate-form" class="gate-card"><label for="gate-input">访问口令</label>
+<input id="gate-input" type="password" autocomplete="current-password" required="" aria-describedby="gate-error">
+<p id="gate-error" role="alert" hidden=""></p><button id="gate-button" class="primary" type="submit">进入课表</button></form>
+<p class="gate-tip">口令在班级群公告里</p>
+</main>
+<main id="fatal" class="entry" hidden=""><svg class="cloud icon" aria-hidden="true"><use href="#i-cloud"></use></svg>
+<h1>暂时无法加载课表</h1><p id="fatal-text" role="alert"></p><p id="fatal-hint"></p>
+<button id="fatal-retry" class="secondary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-refresh"></use></svg>重新加载</button></main>
+<div id="app">
+<header class="topbar"><div class="bar-inner container"><h1 class="brand"><svg aria-hidden="true"><use href="#i-logo"></use></svg>课格</h1>
+<div id="view-tabs" role="tablist" aria-label="课表视图"><button id="tab-today" type="button" role="tab" aria-selected="true" aria-controls="pane-today" data-view="today" tabindex="0">今日</button><button id="tab-week" type="button" role="tab" aria-selected="false" aria-controls="pane-week" tabindex="-1" data-view="week">本周</button></div><p id="bar-update" hidden="">每日 07:00 自动更新</p></div></header>
+<main class="container layout">
+<section id="pane-today" role="tabpanel" aria-labelledby="tab-today" tabindex="0"><p id="today-date" class="date-line">10月22日 星期四 · 第 8 周</p><h2 id="today-title">今天 2 门课</h2><div id="today-list"><button class="course" type="button" data-tone="5" aria-label="周四 第1–2节 汽车构造，7号楼 7203"><span class="course-time"><strong>1–2节</strong></span><span class="course-body"><span class="course-name">汽车构造</span><span class="course-room"><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg><span>7号楼 7203</span></span><span class="course-teacher">示例教师甲</span></span></button><button class="course" type="button" data-tone="7" aria-label="周四 第3–4节 机械设计基础，7号楼 7105"><span class="course-time"><strong>3–4节</strong></span><span class="course-body"><span class="course-name">机械设计基础</span><span class="course-room"><svg class="icon" aria-hidden="true"><use href="#i-pin"></use></svg><span>7号楼 7105</span></span><span class="course-teacher">示例教师乙</span></span></button></div><p id="poem" class="poem">今日一句：春眠不觉晓，处处闻啼鸟。 —— 孟浩然《春晓》</p></section>
+<section id="pane-week" role="tabpanel" aria-labelledby="tab-week" tabindex="0" hidden="">
+<nav class="week-nav" aria-label="周次"><button id="week-prev" class="arrow" type="button" aria-label="上一周">‹</button><div class="week-center"><button id="week-label" type="button" aria-label="回到本周"><span class="week-number">第 8 周</span><span class="week-range"> 10/19–10/25</span><span class="week-badge">本周</span></button><button id="week-reset" type="button" hidden="">回到本周</button></div><button id="week-next" class="arrow" type="button" aria-label="下一周">›</button></nav>
+<p id="week-summary" class="week-summary" aria-live="polite">5 次课 · 4 天 · 常在 7号楼 7203</p><div id="grid-scroll" class="grid-scroll" tabindex="0" role="region" aria-label="周课表"><table id="grid"><caption class="sr-only">第 8 周课表</caption><colgroup><col class="unit-col"><col><col><col><col><col></colgroup><thead><tr><th scope="col">节</th><th scope="col"><span>周一</span><span class="grid-date">10/19</span><span class="grid-load">—</span></th><th scope="col"><span>周二</span><span class="grid-date">10/20</span><span class="grid-load">2节</span></th><th scope="col"><span>周三</span><span class="grid-date">10/21</span><span class="grid-load">2节</span></th><th class="is-today" scope="col"><span>周四</span><span class="grid-date">10/22</span><span class="grid-load">4节</span></th><th scope="col"><span>周五</span><span class="grid-date">10/23</span><span class="grid-load">2节</span></th></tr></thead><tbody><tr><th scope="row">1</th><td></td><td></td><td></td><td class="is-today" rowspan="2"><button class="grid-course" type="button" data-tone="5" aria-label="周四 第1–2节 汽车构造，7号楼 7203" style="height: calc(var(--row-h) * 2 + 2px);"><span class="grid-name">汽车构造</span><span class="grid-room">7号楼 7203</span></button></td><td></td></tr><tr class="unit-divider"><th scope="row">2</th><td></td><td></td><td></td><td></td></tr><tr><th scope="row">3</th><td></td><td></td><td></td><td class="is-today" rowspan="2"><button class="grid-course" type="button" data-tone="7" aria-label="周四 第3–4节 机械设计基础，7号楼 7105" style="height: calc(var(--row-h) * 2 + 2px);"><span class="grid-name">机械设计基础</span><span class="grid-room">7号楼 7105</span></button></td><td></td></tr><tr class="unit-divider"><th scope="row">4</th><td></td><td></td><td></td><td></td></tr><tr><th scope="row">5</th><td></td><td rowspan="2"><button class="grid-course" type="button" data-tone="7" aria-label="周二 第5–6节 高等数学，A101" style="height: calc(var(--row-h) * 2 + 2px);"><span class="grid-name">高等数学</span><span class="grid-room">A101</span></button></td><td></td><td class="is-today"></td><td></td></tr><tr class="unit-divider"><th scope="row">6</th><td></td><td></td><td class="is-today"></td><td></td></tr><tr><th scope="row">7</th><td></td><td></td><td rowspan="2"><button class="grid-course" type="button" data-tone="3" aria-label="周三 第7–8节 大学英语，B202" style="height: calc(var(--row-h) * 2 + 2px);"><span class="grid-name">大学英语</span><span class="grid-room">B202</span></button></td><td class="is-today"></td><td></td></tr><tr class="unit-divider"><th scope="row">8</th><td></td><td></td><td class="is-today"></td><td></td></tr><tr><th scope="row">9</th><td></td><td></td><td></td><td class="is-today"></td><td rowspan="2"><button class="grid-course" type="button" data-tone="4" aria-label="周五 第9–10节 材料成型，教室待定" style="height: calc(var(--row-h) * 2 + 2px);"><span class="grid-name">材料成型</span><span class="grid-room">教室待定</span></button></td></tr><tr><th scope="row">10</th><td></td><td></td><td></td><td class="is-today"></td></tr><tr><th scope="row">11</th><td></td><td></td><td></td><td class="is-today"></td><td></td></tr></tbody></table></div><p id="grid-hint" class="grid-hint" hidden="">左右滑动查看周末</p>
+</section></main><footer id="footer" class="container"><span>数据更新于 2026-10-22 07:00</span><span>本学期第 8 周</span><span class="warning">本机日期与服务器不一致（服务器 2026-10-22）</span><span class="footer-update">每日 07:00 自动更新</span></footer></div>
+<div id="sheet" class="sheet" hidden=""><div class="scrim" data-close=""></div><div id="sheet-dialog" class="sheet-dialog" role="dialog" aria-modal="true" aria-labelledby="sheet-name" tabindex="-1">
+<div class="handle" aria-hidden="true"></div><div class="sheet-top"><p id="sheet-meta"></p><button id="sheet-close" type="button" aria-label="关闭课程详情">×</button></div>
+<h2 id="sheet-name"></h2><dl id="sheet-facts"></dl><section id="sheet-meetings"><h3>本周排课</h3><div id="meeting-list"></div></section></div></div>
+
+</body></html>

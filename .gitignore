@@ -83,3 +83,6 @@ desktop.ini
 
 # 前端改版的回滚备份（.backup-web-<日期>/）
 .backup-web-*/
+
+# 截图脚本的临时浏览器配置
+design/.edge-*/
